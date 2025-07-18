@@ -1,7 +1,7 @@
 {
   "id": "integrations/langgraph",
   "title": "LangGraph Integration",
-  "description": "Integrate PayStabl with LangGraph workflows to enable autonomous payments within your agent graphs. Add payment nodes that handle API costs, agent compensation, and resource procurement.",
+  "description": "Build LangGraph workflows with payment capabilities using the AgentPay payment kernel.",
   "source": "@site/docs/integrations/langgraph.mdx",
   "sourceDirName": "integrations",
   "slug": "/integrations/langgraph",
@@ -14,7 +14,7 @@
   "frontMatter": {},
   "sidebar": "tutorialSidebar",
   "previous": {
-    "title": "MCP Server Integration",
+    "title": "MCP Integration",
     "permalink": "/integrations/mcp"
   },
   "next": {

@@ -1,7 +1,7 @@
 {
   "id": "tools/pay_agent",
-  "title": "🤝 Tool: pay_agent",
-  "description": "Use this tool to send payments between agents within the PayStabl ecosystem. This is ideal for agent-to-agent plugin usage, compute, data sharing, or tool access.",
+  "title": "Pay Agent Utility",
+  "description": "A helper utility for implementing agent-to-agent payment operations using the AgentPay payment kernel.",
   "source": "@site/docs/tools/pay_agent.mdx",
   "sourceDirName": "tools",
   "slug": "/tools/pay_agent",

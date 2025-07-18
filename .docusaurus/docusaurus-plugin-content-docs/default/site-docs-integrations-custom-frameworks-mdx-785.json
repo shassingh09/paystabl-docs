@@ -1,7 +1,7 @@
 {
   "id": "integrations/custom_frameworks",
   "title": "Custom Framework Integration",
-  "description": "Build PayStabl integration for any AI framework or custom agent system using our SDKs and APIs. This guide covers implementation patterns, best practices, and examples for various agent architectures.",
+  "description": "Build payment capabilities into any agentic framework using the AgentPay payment kernel.",
   "source": "@site/docs/integrations/custom_frameworks.mdx",
   "sourceDirName": "integrations",
   "slug": "/integrations/custom_frameworks",
