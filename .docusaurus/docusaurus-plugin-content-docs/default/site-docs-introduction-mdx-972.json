@@ -19,7 +19,7 @@
   },
   "sidebar": "tutorialSidebar",
   "next": {
-    "title": "Quick Start",
+    "title": "quickstart",
     "permalink": "/quickstart"
   }
 }
