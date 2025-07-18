@@ -1,7 +1,124 @@
-# 🤝 Tool: `pay_agent`
+# Pay Agent Utility
 
-Use this tool to send payments between agents within the PayStabl ecosystem. This is ideal for agent-to-agent plugin usage, compute, data sharing, or tool access.
+A helper utility for implementing agent-to-agent payment operations using the AgentPay payment kernel.
 
+## Overview
+
+The Pay Agent utility provides a simplified interface for building agent-to-agent payment functionality into your applications. It wraps the AgentPay SDK with convenience methods specifically designed for inter-agent transactions.
+
+## Installation
+
+```bash
+npm install @agentpay/pay-agent-utility
+```
+
+## Basic Usage
+
+```javascript
+const { PayAgentUtility } = require('@agentpay/pay-agent-utility');
+
+const payAgent = new PayAgentUtility({
+  apiKey: process.env.AGENTPAY_API_KEY,
+  agentId: 'your-agent-identifier'
+});
+
+// Send payment to another agent
+const result = await payAgent.sendToAgent({
+  recipientAgent: 'recipient-agent-id',
+  amount: 5.00,
+  currency: 'USD',
+  memo: 'Payment for data analysis',
+  metadata: {
+    service: 'data_analysis',
+    requestId: 'req_123'
+  }
+});
+
+console.log('Payment sent:', result);
+```
+
+## Advanced Features
+
+### Agent Directory Integration
+
+```javascript
+// Register your agent in the directory
+await payAgent.registerAgent({
+  name: 'Data Analysis Agent',
+  services: ['data_analysis', 'report_generation'],
+  rates: {
+    'data_analysis': { amount: 5.00, currency: 'USD' },
+    'report_generation': { amount: 10.00, currency: 'USD' }
+  }
+});
+
+// Find and pay other agents
+const dataAgents = await payAgent.findAgents({
+  service: 'data_analysis',
+  maxRate: 10.00
+});
+
+for (const agent of dataAgents) {
+  const quote = await payAgent.requestQuote({
+    agentId: agent.id,
+    service: 'data_analysis',
+    parameters: { dataset_size: 1000 }
+  });
+
+  if (quote.amount <= 5.00) {
+    await payAgent.sendToAgent({
+      recipientAgent: agent.id,
+      amount: quote.amount,
+      memo: `Payment for ${quote.service}`
+    });
+  }
+}
+```
+
+### Payment Workflows
+
+```javascript
+// Create payment workflow for multi-step services
+const workflow = await payAgent.createWorkflow({
+  steps: [
+    { agent: 'data-collector', service: 'collect', amount: 2.00 },
+    { agent: 'data-processor', service: 'process', amount: 3.00 },
+    { agent: 'report-generator', service: 'report', amount: 5.00 }
+  ]
+});
+
+// Execute workflow with automatic payments
+const result = await payAgent.executeWorkflow(workflow.id, {
+  dataset: 'customer_data_2024'
+});
+```
+
+## Error Handling
+
+```javascript
+try {
+  const result = await payAgent.sendToAgent({
+    recipientAgent: 'unknown-agent',
+    amount: 10.00
+  });
+} catch (error) {
+  switch (error.code) {
+    case 'AGENT_NOT_FOUND':
+      console.log('Recipient agent not registered');
+      break;
+    case 'INSUFFICIENT_FUNDS':
+      console.log('Not enough balance for payment');
+      break;
+    case 'PAYMENT_REJECTED':
+      console.log('Payment rejected by recipient');
+      break;
+    default:
+      console.log('Payment failed:', error.message);
+  }
+}
+```
+
+This utility simplifies the implementation of agent-to-agent payment systems while providing the flexibility to customize behavior for your specific use case.
 ---
 
 ## 🤖 Use Case
@@ -268,18 +385,18 @@ async function robustPayAgent(fromAgentId, toAgentId, amount, purpose) {
     switch (error.code) {
       case 'INSUFFICIENT_FUNDS':
         throw new Error(`Agent ${fromAgentId} has insufficient funds for payment of $${amount}`);
-        
+
       case 'AGENT_NOT_FOUND':
         throw new Error(`Recipient agent ${toAgentId} not found in PayStabl network`);
-        
+
       case 'POLICY_VIOLATION':
         throw new Error(`Payment blocked by agent policy: ${error.details}`);
-        
+
       case 'NETWORK_ERROR':
         // Retry with exponential backoff
         await new Promise(resolve => setTimeout(resolve, 1000));
         return robustPayAgent(fromAgentId, toAgentId, amount, purpose);
-        
+
       default:
         throw new Error(`Payment failed: ${error.message}`);
     }
@@ -294,23 +411,23 @@ Verify payments were received successfully:
 ```javascript
 async function verifyPayment(txHash, expectedAmount, expectedRecipient) {
   const transaction = await getTransactionDetails(txHash);
-  
+
   if (!transaction) {
     throw new Error("Transaction not found");
   }
-  
+
   if (transaction.status !== 'completed') {
     throw new Error(`Transaction status: ${transaction.status}`);
   }
-  
+
   if (transaction.amount !== expectedAmount) {
     throw new Error(`Amount mismatch: expected ${expectedAmount}, got ${transaction.amount}`);
   }
-  
+
   if (transaction.to !== expectedRecipient) {
     throw new Error(`Recipient mismatch: expected ${expectedRecipient}, got ${transaction.to}`);
   }
-  
+
   return true;
 }
 ```
@@ -327,7 +444,7 @@ class PaymentEnabledCrew:
     def __init__(self, crew_id):
         self.crew_id = crew_id
         self.paystabl_agent = PayStablAgent(agent_id=crew_id)
-        
+
     def create_paid_task(self, description, agent_id, payment_amount):
         def task_callback(task_output):
             # Pay the agent for completing the task
@@ -338,7 +455,7 @@ class PaymentEnabledCrew:
                 purpose=f"Task completion: {description[:50]}..."
             )
             return task_output
-            
+
         return Task(
             description=description,
             callback=task_callback
@@ -362,12 +479,12 @@ from paystabl import PayStablAgent
 
 def create_payment_workflow():
     paystabl = PayStablAgent(agent_id="workflow_coordinator")
-    
+
     def delegate_task(state):
         # Delegate task to specialist agent
         specialist_id = state["specialist_agent"]
         task_description = state["task"]
-        
+
         # Pay the specialist
         payment = paystabl.pay_agent(
             from_agent_id="workflow_coordinator",
@@ -375,14 +492,14 @@ def create_payment_workflow():
             amount="1.00",
             purpose=f"Task delegation: {task_description}"
         )
-        
+
         # Add payment info to state
         state["payment_receipt"] = payment["xPayStablReceipt"]
         return state
-    
+
     workflow = StateGraph()
     workflow.add_node("delegate", delegate_task)
-    
+
     return workflow
 ```
 
@@ -401,9 +518,9 @@ function calculateServicePrice(task) {
     'medium': 2.0,
     'complex': 5.0
   };
-  
+
   const urgencyMultiplier = task.urgent ? 1.5 : 1.0;
-  
+
   return (basePrice * complexityMultiplier[task.complexity] * urgencyMultiplier).toFixed(2);
 }
 
@@ -411,7 +528,7 @@ function calculateServicePrice(task) {
 async function payBasedOnQuality(agentId, baseAmount, qualityScore) {
   const qualityMultiplier = Math.max(0.5, Math.min(2.0, qualityScore));
   const finalAmount = (parseFloat(baseAmount) * qualityMultiplier).toFixed(2);
-  
+
   return await pay_agent({
     fromAgentId: "quality_assessor",
     toAgentId: agentId,
@@ -430,7 +547,7 @@ class AgentReputationSystem {
   constructor() {
     this.reputation = new Map();
   }
-  
+
   recordTransaction(agentId, amount, quality, timeliness) {
     if (!this.reputation.has(agentId)) {
       this.reputation.set(agentId, {
@@ -440,18 +557,18 @@ class AgentReputationSystem {
         averageTimeliness: 0
       });
     }
-    
+
     const rep = this.reputation.get(agentId);
     rep.totalEarned += parseFloat(amount);
     rep.totalTransactions += 1;
     rep.averageQuality = (rep.averageQuality * (rep.totalTransactions - 1) + quality) / rep.totalTransactions;
     rep.averageTimeliness = (rep.averageTimeliness * (rep.totalTransactions - 1) + timeliness) / rep.totalTransactions;
   }
-  
+
   getReputationScore(agentId) {
     const rep = this.reputation.get(agentId);
     if (!rep) return 0;
-    
+
     return (rep.averageQuality * 0.6 + rep.averageTimeliness * 0.4);
   }
 }
@@ -484,7 +601,7 @@ Maintain comprehensive payment logs:
 ```javascript
 async function auditAgentPayments(agentId, timeframe) {
   const payments = await getAgentTransactions(agentId, timeframe);
-  
+
   const summary = {
     totalSent: 0,
     totalReceived: 0,
@@ -492,7 +609,7 @@ async function auditAgentPayments(agentId, timeframe) {
     averageTransactionSize: 0,
     paymentPurposes: {}
   };
-  
+
   payments.forEach(payment => {
     if (payment.fromAgentId === agentId) {
       summary.totalSent += parseFloat(payment.amount);
@@ -501,14 +618,14 @@ async function auditAgentPayments(agentId, timeframe) {
       summary.totalReceived += parseFloat(payment.amount);
       summary.uniqueCounterparts.add(payment.fromAgentId);
     }
-    
+
     const purpose = payment.purpose || 'unspecified';
     summary.paymentPurposes[purpose] = (summary.paymentPurposes[purpose] || 0) + 1;
   });
-  
+
   summary.averageTransactionSize = (summary.totalSent + summary.totalReceived) / payments.length;
   summary.uniqueCounterparts = summary.uniqueCounterparts.size;
-  
+
   return summary;
 }
 ```

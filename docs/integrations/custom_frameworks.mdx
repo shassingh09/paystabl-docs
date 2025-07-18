@@ -1,6 +1,290 @@
 # Custom Framework Integration
 
-Build PayStabl integration for any AI framework or custom agent system using our SDKs and APIs. This guide covers implementation patterns, best practices, and examples for various agent architectures.
+Build payment capabilities into any agentic framework using the AgentPay payment kernel.
+
+## Overview
+
+This guide shows you how to integrate AgentPay's payment capabilities into any agent framework using our REST API and SDKs. Whether you're building with custom frameworks, existing platforms, or proprietary systems, these patterns will help you add autonomous payment functionality.
+
+## Integration Patterns
+
+### 1. REST API Integration
+
+The most flexible way to integrate with any framework:
+
+#### Authentication
+
+All API requests require authentication using your API key:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+     -H "Content-Type: application/json" \
+     https://api.agentpay.ai/v1/payments
+```
+
+#### Core API Endpoints
+
+**Send Payment**
+```http
+POST /v1/payments
+Content-Type: application/json
+Authorization: Bearer YOUR_API_KEY
+
+{
+  "to": "recipient_wallet_address",
+  "amount": 10.00,
+  "currency": "USD",
+  "memo": "Payment for services"
+}
+```
+
+**Check Balance**
+```http
+GET /v1/wallet/balance
+Authorization: Bearer YOUR_API_KEY
+```
+
+**Payment History**
+```http
+GET /v1/payments/history?limit=50&offset=0
+Authorization: Bearer YOUR_API_KEY
+```
+
+**Create Invoice**
+```http
+POST /v1/invoices
+Content-Type: application/json
+Authorization: Bearer YOUR_API_KEY
+
+{
+  "amount": 25.00,
+  "currency": "USD",
+  "description": "API access fee",
+  "expires_at": "2024-02-01T00:00:00Z"
+}
+```
+
+### 2. SDK Integration
+
+Use our SDKs for easier integration:
+
+#### Python Framework Example
+
+```python
+from agentpay import AgentPaySDK
+import asyncio
+
+class PaymentCapableAgent:
+    def __init__(self, api_key: str):
+        self.agentpay = AgentPaySDK(api_key=api_key)
+
+    async def send_payment(self, recipient: str, amount: float, currency: str = "USD"):
+        """Send payment with error handling"""
+        try:
+            result = await self.agentpay.payments.send(
+                to=recipient,
+                amount=amount,
+                currency=currency
+            )
+            return {"success": True, "transaction_id": result["id"]}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def check_funds(self, required_amount: float):
+        """Check if sufficient funds are available"""
+        balance = await self.agentpay.wallet.get_balance()
+        return balance["amount"] >= required_amount
+
+    async def payment_workflow(self, recipient: str, amount: float):
+        """Complete payment workflow with validation"""
+        # Check funds
+        if not await self.check_funds(amount):
+            return {"error": "Insufficient funds"}
+
+        # Send payment
+        result = await self.send_payment(recipient, amount)
+
+        # Log transaction
+        if result["success"]:
+            await self.log_payment(result["transaction_id"])
+
+        return result
+```
+
+#### JavaScript/Node.js Framework Example
+
+```javascript
+const { AgentPaySDK } = require('@agentpay/sdk');
+
+class PaymentAgent {
+    constructor(apiKey) {
+        this.agentpay = new AgentPaySDK({ apiKey });
+    }
+
+    async executePayment(recipient, amount, currency = 'USD') {
+        try {
+            // Validate payment
+            const balance = await this.agentpay.wallet.getBalance();
+            if (balance.amount < amount) {
+                throw new Error('Insufficient funds');
+            }
+
+            // Send payment
+            const result = await this.agentpay.payments.send({
+                to: recipient,
+                amount: amount,
+                currency: currency
+            });
+
+            return { success: true, transactionId: result.id };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async createPaymentIntent(amount, description) {
+        return await this.agentpay.invoices.create({
+            amount: amount,
+            currency: 'USD',
+            description: description
+        });
+    }
+}
+```
+
+### 3. Webhook Integration
+
+Handle payment events in your framework:
+
+```python
+from flask import Flask, request, jsonify
+import hmac
+import hashlib
+
+app = Flask(__name__)
+
+@app.route('/webhooks/agentpay', methods=['POST'])
+def handle_payment_webhook():
+    # Verify webhook signature
+    signature = request.headers.get('X-AgentPay-Signature')
+    if not verify_webhook_signature(request.data, signature):
+        return jsonify({'error': 'Invalid signature'}), 401
+
+    event = request.json
+
+    if event['type'] == 'payment.completed':
+        handle_payment_completed(event['data'])
+    elif event['type'] == 'payment.failed':
+        handle_payment_failed(event['data'])
+
+    return jsonify({'status': 'received'})
+
+def verify_webhook_signature(payload, signature):
+    expected = hmac.new(
+        WEBHOOK_SECRET.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(f"sha256={expected}", signature)
+```
+
+## Error Handling Patterns
+
+### Retry Logic
+
+```python
+import asyncio
+from typing import Optional
+
+async def robust_payment(
+    agent: PaymentCapableAgent,
+    recipient: str,
+    amount: float,
+    max_retries: int = 3
+) -> dict:
+    """Payment with exponential backoff retry"""
+    for attempt in range(max_retries):
+        try:
+            result = await agent.send_payment(recipient, amount)
+            if result["success"]:
+                return result
+        except Exception as e:
+            if attempt == max_retries - 1:
+                return {"success": False, "error": f"Failed after {max_retries} attempts: {str(e)}"}
+
+            # Exponential backoff
+            await asyncio.sleep(2 ** attempt)
+
+    return {"success": False, "error": "Max retries exceeded"}
+```
+
+### Transaction Validation
+
+```python
+async def validate_and_send_payment(
+    agent: PaymentCapableAgent,
+    recipient: str,
+    amount: float
+) -> dict:
+    """Validate payment before sending"""
+    # Validate recipient address
+    if not is_valid_wallet_address(recipient):
+        return {"error": "Invalid recipient address"}
+
+    # Validate amount
+    if amount <= 0:
+        return {"error": "Amount must be positive"}
+
+    # Check balance
+    if not await agent.check_funds(amount):
+        return {"error": "Insufficient funds"}
+
+    # Send payment
+    return await agent.send_payment(recipient, amount)
+
+def is_valid_wallet_address(address: str) -> bool:
+    """Validate wallet address format"""
+    return address.startswith('0x') and len(address) == 42
+```
+
+## Framework-Specific Examples
+
+### Custom Agent Loop
+
+```python
+class AutonomousPaymentAgent:
+    def __init__(self, api_key: str):
+        self.agentpay = AgentPaySDK(api_key=api_key)
+        self.running = False
+
+    async def agent_loop(self):
+        """Main agent execution loop with payment capabilities"""
+        self.running = True
+
+        while self.running:
+            # Check for payment requests
+            pending_payments = await self.get_pending_payments()
+
+            for payment in pending_payments:
+                await self.process_payment_request(payment)
+
+            # Check balance periodically
+            await self.monitor_wallet_balance()
+
+            await asyncio.sleep(10)  # Check every 10 seconds
+
+    async def process_payment_request(self, payment_request):
+        """Process individual payment request"""
+        result = await self.agentpay.payments.send(
+            to=payment_request['recipient'],
+            amount=payment_request['amount']
+        )
+
+        # Update request status
+        await self.update_payment_status(payment_request['id'], result)
+```
+
+This flexible approach allows you to integrate AgentPay's payment capabilities into any agent framework while maintaining full control over the implementation details.
 
 ## SDK Options
 
@@ -16,7 +300,7 @@ import { PayStablAgent } from '@paystabl/sdk';
 
 class MyCustomAgent {
   private paystabl: PayStablAgent;
-  
+
   constructor(agentId: string, config: AgentConfig) {
     this.paystabl = new PayStablAgent({
       agentId,
@@ -84,7 +368,7 @@ class CustomPythonAgent:
             api_key=api_key,
             network="base-sepolia"
         )
-    
+
     def call_paid_api(self, url: str, method="GET", data=None, headers=None):
         try:
             # Get payment authorization
@@ -94,7 +378,7 @@ class CustomPythonAgent:
                 data=data,
                 headers=headers
             )
-            
+
             # Make request with payment header
             response = requests.request(
                 method=method,
@@ -105,15 +389,15 @@ class CustomPythonAgent:
                 },
                 json=data
             )
-            
+
             return {
                 "data": response.json(),
                 "payment": payment["receipt"]
             }
-            
+
         except Exception as e:
             raise PaymentException(f"Payment failed: {str(e)}")
-    
+
     def pay_agent(self, to_agent_id: str, amount: str, purpose: str):
         return self.paystabl.pay_agent(
             from_agent_id=self.agent_id,
@@ -149,7 +433,7 @@ func NewCustomGoAgent(agentID, apiKey string) *CustomGoAgent {
     client := paystabl.NewClient(apiKey, paystabl.Config{
         Network: "base-sepolia",
     })
-    
+
     return &CustomGoAgent{
         AgentID:  agentID,
         PayStabl: client,
@@ -167,22 +451,22 @@ func (a *CustomGoAgent) CallPaidAPI(url, method string, body interface{}) (*APIR
     if err != nil {
         return nil, err
     }
-    
+
     // Prepare request
     var reqBody bytes.Buffer
     if body != nil {
         json.NewEncoder(&reqBody).Encode(body)
     }
-    
+
     req, err := http.NewRequest(method, url, &reqBody)
     if err != nil {
         return nil, err
     }
-    
+
     // Add payment header
     req.Header.Set("X-Payment", payment.XPaymentHeader)
     req.Header.Set("Content-Type", "application/json")
-    
+
     // Execute request
     client := &http.Client{}
     resp, err := client.Do(req)
@@ -190,10 +474,10 @@ func (a *CustomGoAgent) CallPaidAPI(url, method string, body interface{}) (*APIR
         return nil, err
     }
     defer resp.Body.Close()
-    
+
     var result APIResponse
     json.NewDecoder(resp.Body).Decode(&result)
-    
+
     return &result, nil
 }
 
@@ -301,7 +585,7 @@ interface AgentPlugin {
 class PayStablPlugin implements AgentPlugin {
   name = 'paystabl';
   version = '1.0.0';
-  
+
   private paystabl: PayStablAgent;
   private agent: any;
 
@@ -326,10 +610,10 @@ class PayStablPlugin implements AgentPlugin {
   async paymentMiddleware(request: any, next: Function) {
     // Automatically handle 402 responses
     const response = await next(request);
-    
+
     if (response.status === 402) {
       console.log('402 Payment Required detected, processing payment...');
-      
+
       const payment = await this.paystabl.pay_api_endpoint({
         url: request.url,
         method: request.method,
@@ -510,15 +794,15 @@ export const AgentPaymentUI: React.FC<AgentUIProps> = ({ agentId, apiKey }) => {
 
     try {
       const payment = await paystabl.pay_api_endpoint({ url });
-      
+
       // Update UI with payment result
       setTransactions(prev => [...prev, payment.receipt]);
-      
+
       // Make actual API call
       const response = await fetch(url, {
         headers: { 'X-Payment': payment.xPaymentHeader }
       });
-      
+
       return await response.json();
     } catch (error) {
       console.error('Payment failed:', error);
@@ -530,7 +814,7 @@ export const AgentPaymentUI: React.FC<AgentUIProps> = ({ agentId, apiKey }) => {
       <div className="balance">
         Balance: ${balance}
       </div>
-      
+
       <div className="transactions">
         <h3>Recent Transactions</h3>
         {transactions.map(tx => (
@@ -539,7 +823,7 @@ export const AgentPaymentUI: React.FC<AgentUIProps> = ({ agentId, apiKey }) => {
           </div>
         ))}
       </div>
-      
+
       <button onClick={() => handleAPIPayment('https://api.example.com/data')}>
         Pay for Premium Data
       </button>
@@ -560,7 +844,7 @@ class Agent(models.Model):
     name = models.CharField(max_length=200)
     api_key = models.CharField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     def get_paystabl_client(self):
         return PayStablAgent(
             agent_id=self.agent_id,
@@ -584,16 +868,16 @@ class PaymentView(View):
         try:
             agent = Agent.objects.get(agent_id=agent_id)
             paystabl = agent.get_paystabl_client()
-            
+
             data = json.loads(request.body)
-            
+
             if data['type'] == 'api_payment':
                 result = paystabl.pay_api_endpoint(
                     url=data['url'],
                     method=data.get('method', 'GET'),
                     data=data.get('payload')
                 )
-                
+
                 # Log the payment
                 PaymentLog.objects.create(
                     agent=agent,
@@ -601,13 +885,13 @@ class PaymentView(View):
                     purpose=f"API payment to {data['url']}",
                     tx_hash=result['receipt']['txHash']
                 )
-                
+
                 return JsonResponse({
                     'success': True,
                     'payment_header': result['xPaymentHeader'],
                     'receipt': result['receipt']
                 })
-            
+
             elif data['type'] == 'agent_payment':
                 result = paystabl.pay_agent(
                     from_agent_id=agent_id,
@@ -615,7 +899,7 @@ class PaymentView(View):
                     amount=data['amount'],
                     purpose=data['purpose']
                 )
-                
+
                 # Log the payment
                 PaymentLog.objects.create(
                     agent=agent,
@@ -623,13 +907,13 @@ class PaymentView(View):
                     purpose=data['purpose'],
                     tx_hash=result['txHash']
                 )
-                
+
                 return JsonResponse({
                     'success': True,
                     'tx_hash': result['txHash'],
                     'receipt': result['xPayStablReceipt']
                 })
-                
+
         except Exception as e:
             return JsonResponse({
                 'success': False,
@@ -663,7 +947,7 @@ class AgentPaymentRequest(BaseModel):
 class PaymentService:
     def __init__(self):
         self.agents = {}
-    
+
     def get_agent(self, agent_id: str) -> PayStablAgent:
         if agent_id not in self.agents:
             self.agents[agent_id] = PayStablAgent(
@@ -678,20 +962,20 @@ payment_service = PaymentService()
 async def pay_api_endpoint(request: APIPaymentRequest):
     try:
         agent = payment_service.get_agent(request.agent_id)
-        
+
         result = await agent.pay_api_endpoint(
             url=request.url,
             method=request.method,
             data=request.data,
             headers=request.headers
         )
-        
+
         return {
             "success": True,
             "payment_header": result["xPaymentHeader"],
             "receipt": result["receipt"]
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -699,20 +983,20 @@ async def pay_api_endpoint(request: APIPaymentRequest):
 async def pay_agent(request: AgentPaymentRequest):
     try:
         agent = payment_service.get_agent(request.from_agent_id)
-        
+
         result = await agent.pay_agent(
             from_agent_id=request.from_agent_id,
             to_agent_id=request.to_agent_id,
             amount=request.amount,
             purpose=request.purpose
         )
-        
+
         return {
             "success": True,
             "tx_hash": result["txHash"],
             "receipt": result["xPayStablReceipt"]
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -721,12 +1005,12 @@ async def get_balance(agent_id: str):
     try:
         agent = payment_service.get_agent(agent_id)
         balance = await agent.get_balance()
-        
+
         return {
             "agent_id": agent_id,
             "balance": balance
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 ```
@@ -806,7 +1090,7 @@ async def test_end_to_end_api_payment(test_agent):
         url="https://test-402-api.paystabl.com/premium-data",
         method="GET"
     )
-    
+
     assert result["xPaymentHeader"] is not None
     assert result["receipt"]["txHash"] is not None
     assert float(result["receipt"]["amount"]) > 0
@@ -820,7 +1104,7 @@ async def test_agent_to_agent_payment(test_agent):
         amount="0.10",
         purpose="Integration test payment"
     )
-    
+
     assert result["status"] == "success"
     assert result["txHash"] is not None
 ```
@@ -841,23 +1125,23 @@ class RobustPaymentHandler {
 
   async handlePaymentWithRetry(paymentFn: () => Promise<any>): Promise<any> {
     let lastError: Error;
-    
+
     for (let attempt = 1; attempt <= this.retryPolicy.maxAttempts; attempt++) {
       try {
         return await paymentFn();
       } catch (error) {
         lastError = error;
-        
+
         if (this.isRetryableError(error) && attempt < this.retryPolicy.maxAttempts) {
           const delay = this.calculateDelay(attempt);
           await this.sleep(delay);
           continue;
         }
-        
+
         throw error;
       }
     }
-    
+
     throw lastError;
   }
 
@@ -882,77 +1166,7 @@ class RobustPaymentHandler {
 interface PaymentConfig {
   agentId: string;
   apiKey: string;
-  network: 'mainnet' | 'base-sepolia';
-  policies: {
-    dailyLimit: string;
-    perCallLimit: string;
-    allowedDomains: string[];
-  };
-  retryPolicy: {
-    maxAttempts: number;
-    backoffFactor: number;
-  };
-  monitoring: {
-    enableLogging: boolean;
-    alertThresholds: {
-      dailySpend: string;
-      failureRate: number;
-    };
-  };
-}
-
-class ConfigurablePaymentAgent {
-  private config: PaymentConfig;
-  private paystabl: PayStablAgent;
-
-  constructor(config: PaymentConfig) {
-    this.config = this.validateConfig(config);
-    this.paystabl = new PayStablAgent({
-      agentId: config.agentId,
-      apiKey: config.apiKey,
-      network: config.network
-    });
-    
-    this.setupPolicies();
-    this.setupMonitoring();
-  }
-
-  private validateConfig(config: PaymentConfig): PaymentConfig {
-    if (!config.agentId || !config.apiKey) {
-      throw new Error('Agent ID and API key are required');
-    }
-    
-    if (parseFloat(config.policies.dailyLimit) <= 0) {
-      throw new Error('Daily limit must be positive');
-    }
-    
-    return config;
-  }
-
-  private async setupPolicies() {
-    await this.paystabl.configurePolicies({
-      dailyLimit: this.config.policies.dailyLimit,
-      perCallLimit: this.config.policies.perCallLimit,
-      allowedDomains: this.config.policies.allowedDomains
-    });
-  }
-
-  private setupMonitoring() {
-    if (this.config.monitoring.enableLogging) {
-      // Setup logging and monitoring
-      this.paystabl.on('payment_completed', (event) => {
-        console.log(`Payment completed: ${event.amount} to ${event.recipient}`);
-      });
-      
-      this.paystabl.on('payment_failed', (event) => {
-        console.error(`Payment failed: ${event.error}`);
-      });
-    }
-  }
-}
-```
-
-## Deployment Considerations
+  network: 'mainnet' | 'base-## Deployment Considerations
 
 ### Docker Integration
 
@@ -1035,18 +1249,3 @@ metadata:
 type: Opaque
 data:
   api-key: <base64-encoded-api-key>
-```
-
-## Related Documentation
-
-- [Core Payment Tools](/docs/tools/pay_api_endpoint)
-- [Security Best Practices](/docs/security)
-- [API Reference](/docs/reference/x402_headers)
-- [Example Implementations](/docs/examples)
-
-## Support
-
-- [SDK Documentation](https://docs.paystabl.com/sdk)
-- [GitHub Repositories](https://github.com/paystabl)
-- [Discord Community](https://discord.gg/paystabl)
-- [Email Support](mailto:support@paystabl.com)

@@ -1,4 +1,121 @@
-# MCP Server Integration
+# MCP Integration
+
+Build MCP servers with payment capabilities using the AgentPay payment kernel.
+
+## Overview
+
+The Model Context Protocol (MCP) allows AI models to securely connect to external data sources and tools. This guide shows you how to build your own MCP server that integrates AgentPay's payment capabilities.
+
+## Building Your MCP Server
+
+### 1. Install Dependencies
+
+```bash
+npm install @modelcontextprotocol/sdk @agentpay/sdk
+```
+
+### 2. Create Your MCP Server
+
+```typescript
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { AgentPaySDK } from '@agentpay/sdk';
+
+const agentPay = new AgentPaySDK({
+  apiKey: process.env.AGENTPAY_API_KEY
+});
+
+const server = new Server(
+  {
+    name: 'agentpay-mcp-server',
+    version: '1.0.0',
+  },
+  {
+    capabilities: {
+      tools: {},
+    },
+  }
+);
+
+// List available payment tools
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  return {
+    tools: [
+      {
+        name: 'send_payment',
+        description: 'Send a payment to another agent or wallet',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            to: { type: 'string', description: 'Recipient wallet address' },
+            amount: { type: 'number', description: 'Amount to send' },
+            currency: { type: 'string', description: 'Currency code' }
+          }
+        }
+      },
+      {
+        name: 'check_balance',
+        description: 'Check current wallet balance',
+        inputSchema: {
+          type: 'object',
+          properties: {}
+        }
+      }
+    ]
+  };
+});
+
+// Handle payment tool calls
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+
+  switch (name) {
+    case 'send_payment':
+      const result = await agentPay.payments.send({
+        to: args.to,
+        amount: args.amount,
+        currency: args.currency
+      });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+
+    case 'check_balance':
+      const balance = await agentPay.wallet.getBalance();
+      return { content: [{ type: 'text', text: JSON.stringify(balance) }] };
+
+    default:
+      throw new Error(`Unknown tool: ${name}`);
+  }
+});
+```
+
+### 3. Configure Claude Desktop
+
+Add your custom MCP server to Claude Desktop configuration:
+
+```json
+{
+  "mcpServers": {
+    "agentpay": {
+      "command": "node",
+      "args": ["path/to/your/mcp-server.js"],
+      "env": {
+        "AGENTPAY_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+## Available Payment Operations
+
+Your MCP server can implement these payment capabilities using the AgentPay SDK:
+
+- **send_payment**: Send payments to other agents or wallets
+- **check_balance**: Query current wallet balance
+- **get_payment_history**: Retrieve transaction history
+- **create_invoice**: Generate payment requests
+- **verify_payment**: Confirm payment completion
 
 Integrate PayStabl with Claude via the Model Context Protocol (MCP) server. This enables Claude to make autonomous payments for APIs and services directly through chat interactions.
 
@@ -187,13 +304,13 @@ Claude: I'll create a comprehensive research report using multiple specialized s
 
 1. Gathering data from premium research APIs...
    ✓ Paid $3.00 for market data access
-   
+
 2. Getting industry analysis...
    ✓ Paid analysis_agent $5.00 for trend analysis
-   
+
 3. Generating visualizations...
    ✓ Paid chart_agent $2.00 for data visualization
-   
+
 4. Professional formatting...
    ✓ Paid formatting_agent $1.50 for document layout
 

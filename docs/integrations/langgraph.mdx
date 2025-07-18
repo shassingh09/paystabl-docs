@@ -1,42 +1,171 @@
 # LangGraph Integration
 
-Integrate PayStabl with LangGraph workflows to enable autonomous payments within your agent graphs. Add payment nodes that handle API costs, agent compensation, and resource procurement.
+Build LangGraph workflows with payment capabilities using the AgentPay payment kernel.
 
-## Quick Setup
+## Overview
 
-Install the PayStabl LangGraph integration:
+LangGraph is a library for building stateful, multi-actor applications with LLMs. This guide shows you how to create custom nodes that integrate AgentPay's payment capabilities into your workflows.
+
+## Installation
 
 ```bash
-pip install paystabl-langgraph
+pip install langgraph agentpay-sdk
 ```
 
-Basic workflow setup:
+## Building Payment Nodes
+
+### 1. Create Payment Node Class
 
 ```python
-from langgraph import StateGraph
-from paystabl_langgraph import PaymentNode, AgentPaymentNode
+from langgraph.graph import StateGraph, END
+from agentpay import AgentPaySDK
+from typing import TypedDict, Dict, Any
+import os
 
-# Create your workflow state
+class PaymentNode:
+    def __init__(self, api_key: str):
+        self.agentpay = AgentPaySDK(api_key=api_key)
+
+    def send_payment(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Send a payment and update workflow state"""
+        try:
+            result = self.agentpay.payments.send(
+                to=state.get("recipient"),
+                amount=state.get("payment_amount"),
+                currency=state.get("currency", "USD")
+            )
+
+            return {
+                **state,
+                "payment_status": "completed",
+                "transaction_id": result["transaction_id"],
+                "messages": state.get("messages", []) + [
+                    f"Payment of {state['payment_amount']} sent to {state['recipient']}"
+                ]
+            }
+        except Exception as e:
+            return {
+                **state,
+                "payment_status": "failed",
+                "error": str(e),
+                "messages": state.get("messages", []) + [f"Payment failed: {str(e)}"]
+            }
+
+    def check_balance(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Check wallet balance and update state"""
+        try:
+            balance = self.agentpay.wallet.get_balance()
+            return {
+                **state,
+                "wallet_balance": balance["amount"],
+                "messages": state.get("messages", []) + [
+                    f"Current balance: {balance['amount']} {balance['currency']}"
+                ]
+            }
+        except Exception as e:
+            return {
+                **state,
+                "error": str(e),
+                "messages": state.get("messages", []) + [f"Balance check failed: {str(e)}"]
+            }
+```
+
+### 2. Define Workflow State
+
+```python
 class WorkflowState(TypedDict):
-    query: str
-    results: dict
-    payment_receipts: list
+    messages: list
+    payment_amount: float
+    recipient: str
+    currency: str
+    payment_status: str
+    transaction_id: str
+    wallet_balance: float
+    error: str
+```
 
-# Initialize the graph
-workflow = StateGraph(WorkflowState)
+### 3. Build Your Workflow
 
-# Add payment-enabled nodes
-workflow.add_node("research", PaymentNode(
-    agent_id="research_agent",
-    api_url="https://premium-research.com/api",
-    price_per_call="2.50"
-))
+```python
+def create_payment_workflow():
+    # Initialize payment node
+    payment_node = PaymentNode(api_key=os.getenv("AGENTPAY_API_KEY"))
 
-workflow.add_node("analysis", AgentPaymentNode(
-    from_agent="coordinator",
-    to_agent="analysis_specialist", 
-    amount="5.00"
-))
+    # Create workflow graph
+    workflow = StateGraph(WorkflowState)
+
+    # Add nodes
+    workflow.add_node("check_balance", payment_node.check_balance)
+    workflow.add_node("send_payment", payment_node.send_payment)
+    workflow.add_node("handle_result", handle_payment_result)
+
+    # Define edges
+    workflow.set_entry_point("check_balance")
+    workflow.add_edge("check_balance", "send_payment")
+    workflow.add_edge("send_payment", "handle_result")
+    workflow.add_edge("handle_result", END)
+
+    return workflow.compile()
+
+def handle_payment_result(state: WorkflowState) -> WorkflowState:
+    """Process payment result and determine next steps"""
+    if state.get("payment_status") == "completed":
+        return {
+            **state,
+            "messages": state["messages"] + ["Payment workflow completed successfully"]
+        }
+    else:
+        return {
+            **state,
+            "messages": state["messages"] + ["Payment workflow failed, may need retry"]
+        }
+```
+
+### 4. Execute Payment Workflow
+
+```python
+# Create and run workflow
+workflow = create_payment_workflow()
+
+initial_state = {
+    "messages": [],
+    "payment_amount": 10.0,
+    "recipient": "0x742d35Cc6C6C27f5CC6666B6A3C9d4d5C2b3F",
+    "currency": "USD",
+    "payment_status": "",
+    "transaction_id": "",
+    "wallet_balance": 0.0,
+    "error": ""
+}
+
+result = workflow.invoke(initial_state)
+print("Workflow completed:", result)
+```
+
+## Advanced Patterns
+
+### Conditional Payment Routing
+
+```python
+def conditional_payment_router(state: WorkflowState) -> str:
+    """Route based on payment conditions"""
+    if state["wallet_balance"] < state["payment_amount"]:
+        return "insufficient_funds"
+    elif state["payment_amount"] > 100:
+        return "large_payment_approval"
+    else:
+        return "standard_payment"
+
+# Add conditional routing to workflow
+workflow.add_conditional_edges(
+    "check_balance",
+    conditional_payment_router,
+    {
+        "insufficient_funds": "handle_insufficient_funds",
+        "large_payment_approval": "request_approval",
+        "standard_payment": "send_payment"
+    }
+)
 ```
 
 ## Core Components
@@ -68,12 +197,12 @@ workflow.add_node("research", create_research_node())
 # Define the node behavior
 def research_step(state: WorkflowState):
     research_node = workflow.get_node("research")
-    
+
     result = research_node.execute({
         "query": state["query"],
         "depth": "comprehensive"
     })
-    
+
     return {
         "results": result["data"],
         "payment_receipts": state["payment_receipts"] + [result["receipt"]]
@@ -99,11 +228,11 @@ def create_collaboration_node():
 # Usage in workflow
 def delegate_task(state: WorkflowState):
     payment_node = workflow.get_node("collaboration")
-    
+
     # Calculate payment based on task complexity
     complexity_score = analyze_task_complexity(state["task"])
     payment_amount = payment_node.calculate_payment(complexity_score)
-    
+
     # Pay the specialist
     payment_result = payment_node.execute({
         "amount": payment_amount,
@@ -113,7 +242,7 @@ def delegate_task(state: WorkflowState):
             "task_id": state["task_id"]
         }
     })
-    
+
     return {
         "delegation_receipt": payment_result,
         "payment_receipts": state["payment_receipts"] + [payment_result]
@@ -138,7 +267,7 @@ class ResearchState(TypedDict):
 
 def create_research_pipeline():
     workflow = StateGraph(ResearchState)
-    
+
     # Step 1: Premium data collection
     workflow.add_node("data_collection", PaymentNode(
         agent_id="research_coordinator",
@@ -150,7 +279,7 @@ def create_research_pipeline():
             "retry_on_payment_fail": True
         }
     ))
-    
+
     # Step 2: Pay specialist for analysis
     workflow.add_node("specialist_analysis", AgentPaymentNode(
         from_agent="research_coordinator",
@@ -159,7 +288,7 @@ def create_research_pipeline():
         base_amount="8.00",
         quality_threshold=0.8
     ))
-    
+
     # Step 3: Conditional payment for additional resources
     workflow.add_node("additional_resources", ConditionalPaymentNode(
         condition=lambda state: state["analysis"]["confidence"] < 0.9,
@@ -169,19 +298,19 @@ def create_research_pipeline():
             amount="12.00"
         )
     ))
-    
+
     # Step 4: Final summarization
     workflow.add_node("summarization", AgentPaymentNode(
         from_agent="research_coordinator",
         to_agent="summary_specialist",
         amount="4.00"
     ))
-    
+
     # Define workflow edges
     workflow.add_edge("data_collection", "specialist_analysis")
     workflow.add_edge("specialist_analysis", "additional_resources") 
     workflow.add_edge("additional_resources", "summarization")
-    
+
     return workflow.compile()
 
 # Execute the workflow
@@ -203,7 +332,7 @@ class DynamicPricingWorkflow:
     def __init__(self):
         self.workflow = StateGraph(self.WorkflowState)
         self.setup_nodes()
-    
+
     class WorkflowState(TypedDict):
         task: str
         complexity: float
@@ -211,20 +340,20 @@ class DynamicPricingWorkflow:
         quality_required: float
         budget: float
         results: dict
-    
+
     def calculate_dynamic_price(self, state):
         base_price = 5.00
         complexity_multiplier = 1 + (state["complexity"] - 0.5) * 2
         urgency_multiplier = 1 + (state["urgency"] - 0.5) * 1.5
         quality_multiplier = 1 + (state["quality_required"] - 0.5) * 1.2
-        
+
         final_price = base_price * complexity_multiplier * urgency_multiplier * quality_multiplier
         return min(final_price, state["budget"])  # Respect budget constraints
-    
+
     def setup_nodes(self):
         # Dynamic pricing node
         self.workflow.add_node("price_calculation", self.calculate_price_step)
-        
+
         # Payment execution node
         self.workflow.add_node("execute_payment", PaymentNode(
             agent_id="dynamic_coordinator",
@@ -234,10 +363,10 @@ class DynamicPricingWorkflow:
                 {"agent": "standard_service", "max_amount": "1.50"}
             ]
         ))
-        
+
         # Quality verification
         self.workflow.add_node("verify_quality", self.quality_check_step)
-        
+
         # Conditional refund/bonus
         self.workflow.add_node("final_payment", ConditionalPaymentNode(
             conditions=[
@@ -253,11 +382,11 @@ class DynamicPricingWorkflow:
                 }
             ]
         ))
-    
+
     def calculate_price_step(self, state):
         price = self.calculate_dynamic_price(state)
         return {"calculated_price": price}
-    
+
     def quality_check_step(self, state):
         # Simulate quality assessment
         quality_score = evaluate_result_quality(state["results"])
@@ -296,12 +425,12 @@ def create_batch_processor():
 # Usage
 def batch_processing_step(state):
     batch_node = workflow.get_node("batch_processor")
-    
+
     results = batch_node.execute_batch([
         {"data": item, "payment_type": "api_payment"} 
         for item in state["batch_items"]
     ])
-    
+
     return {
         "processed_items": [r["result"] for r in results],
         "payment_receipts": [r["receipt"] for r in results],
@@ -328,7 +457,7 @@ class SubscriptionWorkflow:
                 "notification_threshold": "5.00"  # Notify when balance is low
             }
         )
-    
+
     def setup_subscription(self, service_agent, monthly_fee):
         return self.subscription_node.create_subscription({
             "to_agent": service_agent,
@@ -337,15 +466,15 @@ class SubscriptionWorkflow:
             "auto_renew": True,
             "cancellation_policy": "end_of_billing_period"
         })
-    
+
     def manage_subscriptions_step(self, state):
         active_subscriptions = self.subscription_node.get_active_subscriptions()
-        
+
         for subscription in active_subscriptions:
             if subscription["next_payment"] <= datetime.now():
                 payment_result = self.subscription_node.process_renewal(subscription["id"])
                 state["payment_log"].append(payment_result)
-        
+
         return state
 ```
 
@@ -386,21 +515,21 @@ def create_fault_tolerant_node():
 
 def resilient_payment_step(state):
     payment_node = workflow.get_node("resilient_payment")
-    
+
     try:
         result = payment_node.execute_with_recovery({
             "primary_service": "premium_api",
             "backup_services": ["standard_api", "basic_api"],
             "budget_constraint": state["max_budget"]
         })
-        
+
         return {
             "service_used": result["service"],
             "data": result["response"],
             "cost": result["amount"],
             "fallback_used": result["fallback_used"]
         }
-        
+
     except PaymentException as e:
         return {
             "error": str(e),
@@ -417,28 +546,28 @@ def resilient_payment_step(state):
 # Complete research workflow with payments
 def create_research_assistant():
     workflow = StateGraph(ResearchState)
-    
+
     # Literature search with payment
     workflow.add_node("literature_search", PaymentNode(
         agent_id="research_assistant",
         api_url="https://academic-search.com/api",
         price_per_query="3.50"
     ))
-    
+
     # Expert consultation via agent payment
     workflow.add_node("expert_consultation", AgentPaymentNode(
         from_agent="research_assistant",
         to_agent="domain_expert",
         amount_calculator=lambda topic: expertise_pricing[topic]
     ))
-    
+
     # Data analysis service
     workflow.add_node("data_analysis", PaymentNode(
         agent_id="research_assistant", 
         api_url="https://analysis-service.com/api",
         payment_per_dataset="5.00"
     ))
-    
+
     # Final report generation
     workflow.add_node("report_generation", AgentPaymentNode(
         from_agent="research_assistant",
@@ -446,7 +575,7 @@ def create_research_assistant():
         quality_based_payment=True,
         base_amount="10.00"
     ))
-    
+
     return workflow.compile()
 ```
 
@@ -455,14 +584,14 @@ def create_research_assistant():
 ```python
 def create_customer_service_workflow():
     workflow = StateGraph(CustomerServiceState)
-    
+
     # Sentiment analysis via paid API
     workflow.add_node("sentiment_analysis", PaymentNode(
         agent_id="customer_service",
         api_url="https://sentiment-api.com/analyze",
         price_per_request="0.25"
     ))
-    
+
     # Escalate to human agent (paid consultation)
     workflow.add_node("human_escalation", ConditionalPaymentNode(
         condition=lambda state: state["sentiment"]["anger"] > 0.8,
@@ -473,7 +602,7 @@ def create_customer_service_workflow():
             priority="urgent"
         )
     ))
-    
+
     # Knowledge base lookup (paid premium search)
     workflow.add_node("knowledge_search", PaymentNode(
         agent_id="customer_service",
@@ -484,7 +613,7 @@ def create_customer_service_workflow():
             "premium": "3.00"
         }
     ))
-    
+
     return workflow.compile()
 ```
 
@@ -499,14 +628,14 @@ class CostOptimizedWorkflow:
         self.daily_budget = daily_budget
         self.current_spend = 0.0
         self.cost_tracker = {}
-    
+
     def track_cost(self, node_name, amount):
         self.current_spend += float(amount)
         self.cost_tracker[node_name] = self.cost_tracker.get(node_name, 0) + float(amount)
-    
+
     def check_budget(self, proposed_amount):
         return (self.current_spend + float(proposed_amount)) <= self.daily_budget
-    
+
     def get_cost_summary(self):
         return {
             "total_spend": self.current_spend,
