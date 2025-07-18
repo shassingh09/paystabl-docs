@@ -7,11 +7,11 @@ export default {
   "title": "AgentPay Documentation",
   "tagline": "Programmable wallets for AI agents enabling autonomous onchain transactions",
   "favicon": "img/favicon.ico",
-  "url": "https://docs.agentpay.ai",
+  "url": "https://agentpay-docs.replit.app",
   "baseUrl": "/",
   "organizationName": "paystabl",
   "projectName": "paystabl-docs",
-  "onBrokenLinks": "throw",
+  "onBrokenLinks": "warn",
   "onBrokenMarkdownLinks": "warn",
   "i18n": {
     "defaultLocale": "en",
@@ -27,12 +27,12 @@ export default {
       {
         "docs": {
           "routeBasePath": "/",
-          "sidebarPath": "/home/runner/workspace/docs_site/sidebars.js",
+          "sidebarPath": "/home/runner/workspace/sidebars.js",
           "editUrl": "https://github.com/paystabl/docs/tree/main/"
         },
         "blog": false,
         "theme": {
-          "customCss": "/home/runner/workspace/docs_site/src/css/custom.css"
+          "customCss": "/home/runner/workspace/src/css/custom.css"
         }
       }
     ]

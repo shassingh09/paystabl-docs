@@ -1,12 +1,17 @@
-run = "npm start -- --port 3001 --host 0.0.0.0"
-entrypoint = "docusaurus.config.js"
+run = "npm run serve"
+modules = ["nodejs-18", "web", "nix"]
 
 [nix]
-channel = "stable-22_11"
+channel = "stable-24_05"
 
 [deployment]
-run = ["sh", "-c", "npm run build && npm run serve -- --port 3001 --host 0.0.0.0"]
+run = ["sh", "-c", "npm run serve"]
+deploymentTarget = "cloudrun"
 
 [[ports]]
 localPort = 3001
 externalPort = 80
+
+[[ports]]
+localPort = 3002
+externalPort = 3002
