@@ -63,8 +63,8 @@ const config = {
         logo: {
           alt: "PayStabl Logo",
           src: "img/header-logo.png",
-          width: 32,
-          height: 32,
+          width: 42,
+          height: 42,
         },
         items: [
           {

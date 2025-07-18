@@ -4,7 +4,7 @@
  * Modify the docusaurus.config.js file at your site's root instead.
  */
 export default {
-  "title": "AgentPay Documentation",
+  "title": "PayStabl AgentPay Documentation",
   "tagline": "Programmable wallets for AI agents enabling autonomous onchain transactions",
   "favicon": "img/favicon.ico",
   "url": "https://agentpay-docs.replit.app",
@@ -40,12 +40,12 @@ export default {
   "themeConfig": {
     "image": "img/paystabl-social-card.jpg",
     "navbar": {
-      "title": "AgentPay",
+      "title": "",
       "logo": {
-        "alt": "AgentPay Logo",
-        "src": "img/logo.svg",
-        "width": 32,
-        "height": 32
+        "alt": "PayStabl Logo",
+        "src": "img/header-logo.png",
+        "width": 110,
+        "height": 100
       },
       "items": [
         {
@@ -55,13 +55,8 @@ export default {
           "label": "Documentation"
         },
         {
-          "href": "https://app.agentpay.ai",
+          "href": "https://paystabl.com/",
           "label": "Dashboard",
-          "position": "right"
-        },
-        {
-          "href": "https://github.com/agentpay/agentpay",
-          "label": "GitHub",
           "position": "right"
         }
       ],
