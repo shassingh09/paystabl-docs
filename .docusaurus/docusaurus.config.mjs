@@ -81,23 +81,23 @@ export default {
         {
           "title": "Community",
           "items": [
-            // {
-            //   "label": "Discord",
-            //   "href": "https://discord.gg/paystabl"
-            // },
+            {
+              "label": "Discord",
+              "href": "https://discord.gg/paystabl"
+            },
             {
               "label": "Twitter",
-              "href": "https://x.com/paystabl"
+              "href": "https://twitter.com/paystabl"
             }
           ]
         },
         {
           "title": "More",
           "items": [
-            // {
-            //   "label": "GitHub",
-            //   "href": "https://github.com/paystabl/docs"
-            // }
+            {
+              "label": "GitHub",
+              "href": "https://github.com/paystabl/docs"
+            }
           ]
         }
       ],
