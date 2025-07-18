@@ -1,3 +1,4 @@
+
 ---
 sidebar_position: 2
 title: Quick Start
@@ -6,246 +7,280 @@ description: Get started with PayStabl in minutes
 
 # Quickstart Guide
 
-Get your AI agent making autonomous payments in under 5 minutes with this step-by-step guide.
+Get your AI agent making autonomous payments in under 5 minutes with this streamlined approach.
 
-## Prerequisites
+## Step 1: Register Your Agent
 
-- Node.js 18+ or Python 3.8+
-- A Coinbase Developer Platform account
-- Basic understanding of AI agent frameworks
+Give your AI agent a wallet, an onchain identity, and set policies to control how it operates.
 
-## Step 1: Install PayStabl SDK
+### Create Agent Identity
 
-### JavaScript/TypeScript
-
-```bash
-npm install @paystabl/sdk
-# or
-yarn add @paystabl/sdk
-```
-
-### Python
-
-```bash
-pip install paystabl-python
-```
-
-## Step 2: Create Your Agent Wallet
+Register your agent with PayStabl to establish its onchain identity:
 
 ```javascript
-import { PayStablAgent } from '@paystabl/sdk';
-
-// Initialize your agent with a new wallet
-const agent = new PayStablAgent({
-  name: "my-first-agent",
-  network: "base-sepolia", // Use testnet for development
+// Register your agent with PayStabl
+const agent = await PayStabl.registerAgent({
+  name: "my-weather-agent",
+  description: "AI agent that provides weather data services",
+  network: "base-sepolia" // Use testnet for development
 });
 
-// Generate a new wallet for your agent
-const wallet = await agent.createWallet();
-console.log("Agent Wallet Address:", wallet.address);
-console.log("Save this private key securely:", wallet.privateKey);
+console.log("Agent ID:", agent.id);
+console.log("Agent Wallet:", agent.walletAddress);
 ```
 
-> **Security Note**: Store the private key securely. In production, use environment variables or a secure key management system.
+### Configure Agent Policies
 
-## Step 3: Fund Your Agent Wallet
+Set up spending limits and security policies to govern your agent's behavior:
 
-For testnet development, get free tokens:
+```javascript
+await PayStabl.configurePolicies(agent.id, {
+  dailyLimit: "10.00",        // Maximum $10 per day
+  perCallLimit: "1.00",       // Maximum $1 per transaction
+  allowedDomains: [           // Restrict to trusted APIs
+    "api.weatherapi.com",
+    "premium-data.io"
+  ],
+  requireApproval: {          // Require manual approval for large amounts
+    threshold: "5.00"
+  },
+  sessionDuration: "24h"      // How long agent can operate without re-auth
+});
+```
+
+### Fund Your Agent Wallet
+
+For testnet development, get free tokens to fund your agent's operations:
 
 ```bash
 # Get Base Sepolia ETH from faucet
 curl -X POST https://faucet.quicknode.com/base/sepolia \
   -H "Content-Type: application/json" \
-  -d '{"address": "YOUR_WALLET_ADDRESS"}'
+  -d '{"address": "YOUR_AGENT_WALLET_ADDRESS"}'
 ```
 
 Or visit the [Base Sepolia Faucet](https://faucet.quicknode.com/base/sepolia) directly.
 
-## Step 4: Configure Agent Policies
+## Step 2: Framework Integration
 
-Set up spending limits and security policies:
+Use PayStabl with your preferred AI framework - MCPs, LangGraph, CrewAI, and more.
 
-```javascript
-await agent.configurePolicies({
-  dailyLimit: "10.00",     // Maximum $10 per day
-  perCallLimit: "1.00",    // Maximum $1 per transaction
-  allowedDomains: [        // Restrict to trusted APIs
-    "api.example.com",
-    "premium-data.io"
-  ],
-  requireApproval: {       // Require manual approval for large amounts
-    threshold: "5.00"
-  }
-});
-```
+### Claude MCP Integration
 
-## Step 5: Make Your First Payment
-
-Test the payment system with a simple API call:
-
-```javascript
-// Example: Pay for premium weather data
-try {
-  const result = await agent.pay_api_endpoint({
-    url: "https://api.weatherapi.com/v1/current.json?key=premium&q=London",
-    agentId: "my-first-agent",
-    method: "GET"
-  });
-
-  // Use the payment header in your actual request
-  const response = await fetch(result.url, {
-    headers: {
-      "X-Payment": result.xPaymentHeader,
-      "Content-Type": "application/json"
-    }
-  });
-
-  const data = await response.json();
-  console.log("Weather data:", data);
-  console.log("Payment receipt:", result.receipt);
-
-} catch (error) {
-  console.error("Payment failed:", error.message);
-}
-```
-
-## Step 6: Test Agent-to-Agent Payments
-
-If you have multiple agents, test inter-agent payments:
-
-```javascript
-// Agent A pays Agent B for a service
-await agentA.pay_agent({
-  fromAgentId: "agent-a",
-  toAgentId: "agent-b", 
-  amount: "0.50",
-  purpose: "Used summarization service"
-});
-```
-
-## Common Integration Patterns
-
-### Claude MCP Server Integration
-
-```javascript
-// Install MCP server
+```bash
+# Install PayStabl MCP server
 npm install @paystabl/mcp-server
+```
 
+```javascript
 // Configure Claude to use PayStabl tools
 const server = new PayStablMCPServer({
-  agentId: "claude-assistant",
-  apiKey: process.env.PAYSTABL_API_KEY
+  agentId: "my-weather-agent"
 });
 
-server.addTool("premium_search", {
-  description: "Search premium database",
-  handler: async (query) => {
-    return await agent.pay_api_endpoint({
-      url: `https://premium-search.com/api?q=${query}`,
-      agentId: "claude-assistant"
-    });
-  }
-});
+// Claude can now use pay_api_endpoint and pay_agent tools
+server.start();
 ```
 
 ### LangGraph Integration
 
 ```python
-from paystabl import PayStablAgent
-from langgraph import StateGraph
+from paystabl import PayStablNode
 
-agent = PayStablAgent(agent_id="langgraph-agent")
-
-def payment_node(state):
-    """Node that handles paid API calls"""
-    result = agent.pay_api_endpoint(
-        url=state["api_url"],
-        agent_id="langgraph-agent"
-    )
-    return {"payment_result": result}
-
-# Add to your workflow
-workflow = StateGraph()
-workflow.add_node("payment", payment_node)
+# Add payment capabilities to your LangGraph workflow
+def create_payment_workflow():
+    workflow = StateGraph()
+    
+    # Add PayStabl payment node
+    workflow.add_node("payment", PayStablNode(
+        agent_id="my-weather-agent"
+    ))
+    
+    return workflow
 ```
 
-## Monitoring and Debugging
+### CrewAI Integration
+
+```python
+from paystabl import PayStablTool
+
+# Add payment tools to your CrewAI agents
+payment_tool = PayStablTool(agent_id="my-weather-agent")
+
+agent = Agent(
+    role="Data Analyst",
+    tools=[payment_tool.pay_api_endpoint, payment_tool.pay_agent]
+)
+```
+
+**Explore More Integrations**: Check out our [integrations section](/integrations/mcp) for detailed guides on connecting PayStabl with popular AI frameworks.
+
+## Step 3: Let Agents Operate Onchain
+
+Once registered and integrated, your agents can autonomously handle payments for APIs, services, and inter-agent transactions.
+
+### Pay for Premium APIs
+
+Your agent can automatically pay for premium data and services:
+
+```javascript
+// Agent pays for weather API access
+const weatherData = await agent.pay_api_endpoint({
+  url: "https://api.weatherapi.com/v1/premium?q=London",
+  agentId: "my-weather-agent"
+});
+
+console.log("Weather data:", weatherData.response);
+console.log("Payment receipt:", weatherData.receipt);
+```
+
+### Subscribe to Services
+
+Set up recurring payments for subscription-based services:
+
+```javascript
+// Subscribe to premium data feed
+await agent.createSubscription({
+  provider: "premium-data.io",
+  plan: "real-time-updates",
+  frequency: "monthly",
+  amount: "9.99"
+});
+```
+
+### Agent-to-Agent Payments
+
+Enable agents to pay each other for services:
+
+```javascript
+// Weather agent pays summarization agent
+await agent.pay_agent({
+  fromAgentId: "my-weather-agent",
+  toAgentId: "summarization-agent",
+  amount: "0.25",
+  purpose: "Weather summary generation",
+  data: { weatherReport: "..." }
+});
+```
+
+### Handle x402 Payment Required
+
+Agents automatically handle HTTP 402 Payment Required responses:
+
+```javascript
+// Agent encounters paywall and automatically pays
+try {
+  const response = await fetch("https://premium-api.com/data");
+  
+  if (response.status === 402) {
+    // PayStabl automatically handles payment and retries
+    const paidResponse = await agent.handlePaymentRequired(response);
+    return paidResponse.json();
+  }
+} catch (error) {
+  console.log("Payment handled automatically:", error.receipt);
+}
+```
+
+## Monitoring Agent Operations
 
 ### View Transaction History
 
 ```javascript
 // Get recent transactions for your agent
-const transactions = await agent.getTransactions({
+const transactions = await PayStabl.getTransactions({
+  agentId: "my-weather-agent",
   limit: 10,
   status: "completed"
 });
 
 transactions.forEach(tx => {
   console.log(`${tx.timestamp}: ${tx.amount} to ${tx.recipient}`);
+  console.log(`Purpose: ${tx.purpose}`);
 });
 ```
 
 ### Check Agent Balance
 
 ```javascript
-const balance = await agent.getBalance();
+const balance = await PayStabl.getAgentBalance("my-weather-agent");
 console.log(`Agent balance: ${balance.eth} ETH`);
 console.log(`USD equivalent: $${balance.usd}`);
+console.log(`Available for spending: $${balance.available}`);
 ```
 
-### Error Handling
+### Real-time Activity Monitoring
 
 ```javascript
-try {
-  await agent.pay_api_endpoint({ /* ... */ });
-} catch (error) {
-  switch (error.code) {
-    case 'INSUFFICIENT_FUNDS':
-      console.log("Agent needs more funds");
-      break;
-    case 'POLICY_VIOLATION':
-      console.log("Payment blocked by policy:", error.details);
-      break;
-    case 'API_ERROR':
-      console.log("External API error:", error.message);
-      break;
+// Subscribe to agent payment events
+PayStabl.onPayment("my-weather-agent", (event) => {
+  console.log(`Payment: ${event.amount} to ${event.recipient}`);
+  console.log(`Remaining budget: ${event.remainingDailyLimit}`);
+});
+```
+
+## Common Use Cases
+
+### Autonomous Research Agent
+
+```javascript
+// Agent that pays for multiple data sources
+const researchAgent = await PayStabl.registerAgent({
+  name: "research-agent",
+  policies: {
+    dailyLimit: "50.00",
+    allowedDomains: ["academic-api.com", "news-api.org", "data-provider.net"]
   }
-}
+});
+```
+
+### Multi-Agent Marketplace
+
+```javascript
+// Agents providing and consuming services
+const serviceProvider = await PayStabl.registerAgent({
+  name: "translation-service",
+  capabilities: ["translate", "summarize"]
+});
+
+const serviceConsumer = await PayStabl.registerAgent({
+  name: "content-creator",
+  budget: "100.00"
+});
 ```
 
 ## Next Steps
 
-Now that your agent is making payments, explore advanced features:
+Your agent is now ready to operate autonomously onchain! Explore these resources:
 
-1. **[Payment Tools](/docs/tools/pay_api_endpoint)** - Learn all available payment functions
-2. **[Framework Integrations](/docs/integrations/mcp)** - Connect with Claude, LangGraph, and more
-3. **[Security Guide](/docs/security)** - Implement production-ready security
-4. **[Examples](/docs/examples/claude_demo)** - See real-world implementations
+1. **[Framework Integrations](/integrations/mcp)** - Deep dive into MCP, LangGraph, CrewAI integrations
+2. **[Payment Tools](/tools/pay_api_endpoint)** - Learn all available payment functions
+3. **[Security Guide](/security)** - Implement production-ready security policies
+4. **[Architecture](/architecture)** - Understand how PayStabl works under the hood
 
 ## Troubleshooting
 
 ### Common Issues
 
+**"Agent not registered" error**
+- Verify your agent ID is correct
+- Check that registration completed successfully
+- Ensure you're using the right network (mainnet vs testnet)
+
 **"Insufficient funds" error**
-- Check your agent's balance with `agent.getBalance()`
+- Check your agent's balance with `PayStabl.getAgentBalance()`
 - Fund your wallet using the testnet faucet
-- Verify you're using the correct network (mainnet vs testnet)
+- Verify policy limits aren't blocking the transaction
 
 **"Policy violation" error**
-- Review your agent's spending limits
-- Check if the target API is in your allowlist
-- Verify the transaction amount is within limits
-
-**"API not found" error**
-- Ensure the target API supports x402 protocol
-- Check the API endpoint URL is correct
-- Verify your network connectivity
+- Review your agent's spending limits and allowlists
+- Check if the target API domain is approved
+- Verify the transaction amount is within configured limits
 
 ### Getting Help
 
 - [Discord Community](https://discord.gg/paystabl)
-- [GitHub Issues](https://github.com/paystabl/sdk/issues)
+- [GitHub Issues](https://github.com/paystabl/docs/issues)
 - [Email Support](mailto:support@paystabl.com)
 
-Ready to build something awesome? Check out our [integration guides](/docs/integrations/mcp) and [examples](/docs/examples/claude_demo).
+Ready to build autonomous payment flows? Explore our [framework integrations](/integrations/mcp) to get started with your preferred AI development stack.
