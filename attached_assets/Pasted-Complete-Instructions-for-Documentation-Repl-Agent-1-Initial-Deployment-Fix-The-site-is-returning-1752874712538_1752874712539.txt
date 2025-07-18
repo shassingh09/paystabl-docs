@@ -1,0 +1,98 @@
+Complete Instructions for Documentation Repl Agent
+1. Initial Deployment Fix
+The site is returning 404, likely because:
+
+Docusaurus needs to be built and served properly
+The deployment configuration needs adjustment
+First Priority: Get the basic site running at https://agentpay-docs.replit.app
+
+2. Theme Changes (Critical - Too Pink/Light)
+File: src/css/custom.css
+
+Current theme is too pink and light. Need to implement proper dark theme matching main app:
+
+/* Update these color variables */
+:root {
+  /* Dark theme should be default */
+  --ifm-background-color: #0a0a0a;
+  --ifm-background-surface-color: #111111;
+  --ifm-color-primary: #8b5cf6; /* Purple instead of pink */
+  --ifm-color-primary-dark: #7c3aed;
+  --ifm-color-primary-darker: #6d28d9;
+  
+  /* Gradients should be purple-to-pink but much darker */
+  --gradient-bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+}
+Key Requirements:
+
+Default to dark theme (not light)
+Use purple (#8b5cf6) as primary instead of bright pink
+Background should be very dark (#0a0a0a, #111111)
+Subtle purple gradients, not bright pink
+3. Content Architecture Corrections
+Core Issue: Documentation incorrectly suggests we provide ready-made servers/integrations. We actually provide payment kernel code that developers use to build their own integrations.
+
+A. Introduction Page (docs/introduction.mdx)
+Change from: "Connect to our MCP server"
+Change to: "Build integrations using our payment kernel"
+
+Add section: "Architecture Overview"
+
+We provide: Payment kernel/backend API
+You build: Framework-specific integrations
+Result: Agents with payment capabilities
+B. Integrations Section (docs/integrations/)
+MCP Integration (mcp.mdx):
+
+Remove: Instructions to "connect to our MCP server"
+Add: Step-by-step guide to build MCP server using our payment API
+Include: Code examples showing MCP server implementation with our kernel
+LangGraph Integration (langgraph.mdx):
+
+Focus: How to add payment nodes to LangGraph workflows
+Show: Integration patterns, not pre-built components
+n8n Integration (n8n.mdx):
+
+Explain: Building custom n8n nodes using our payment API
+Provide: Node creation examples
+Custom Frameworks (custom_frameworks.mdx):
+
+Create: Generic integration guide for any agentic framework
+Include: REST API patterns, authentication, error handling
+C. Tools Section (docs/tools/)
+Clarify: These are helper utilities, not standalone services
+
+pay_agent.mdx: Utility for payment operations
+pay_api_endpoint.mdx: API wrapper helpers
+D. Examples Section (docs/examples/)
+Update all examples to show:
+
+Integration code (not usage of existing servers)
+How to incorporate payment kernel into agent workflows
+Real implementation patterns
+4. Navigation & Structure
+Ensure sidebar navigation reflects the corrected architecture:
+
+Introduction (payment kernel overview)
+Quick Start (basic integration)
+Architecture (kernel + framework pattern)
+Integrations (build your own)
+Tools (helper utilities)
+Examples (implementation patterns)
+Reference (API docs)
+5. Deployment Configuration
+Verify these files are properly configured:
+
+.replit: Should run on port 3001, map to 80
+package.json: Proper start/serve scripts
+docusaurus.config.js: Correct URL and base path
+6. Testing Checklist
+Before completion:
+
+ Site loads at agentpay-docs.replit.app
+ Dark theme is default and properly dark
+ All content reflects "build integrations" not "use our servers"
+ Navigation works smoothly
+ Mobile responsive
+ No broken internal links
+The goal is accurate documentation that shows developers how to integrate our payment kernel into their own agentic frameworks, not how to use non-existent pre-built servers.

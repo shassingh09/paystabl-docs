@@ -1,0 +1,53 @@
+Instructions for New Documentation Repl Agent
+Theme Changes Needed
+Fix Dark Theme Implementation
+
+File: docs_site/src/css/custom.css
+The current theme is too pink/light - needs to match the main app's dark theme
+Update CSS variables to use darker backgrounds and proper contrast
+Main app uses: from-black via-zinc-900 to-black for dark backgrounds
+Ensure proper dark/light mode toggle functionality
+Gradient Adjustments
+
+Current gradients are too bright pink
+Should match main app: purple-to-pink but darker and more subtle
+Background should be predominantly dark with purple accents
+Content Architecture Changes
+Current Problem: Documentation incorrectly suggests we have MCP servers and various ready-made integrations.
+
+Reality: We have a payment kernel (backend code) that can be integrated into different agentic frameworks.
+
+Specific Content Updates Needed:
+Introduction Page (docs/introduction.mdx)
+
+Remove references to "our MCP server"
+Explain we provide payment kernel code that integrates with various frameworks
+Clarify the architecture: payment backend + framework-specific tools
+Integrations Section (docs/integrations/)
+
+MCP file (mcp.mdx): Change from "Use our MCP server" to "Build MCP server integration using our payment kernel"
+LangGraph file (langgraph.mdx): Show how to integrate payment kernel into LangGraph workflows
+n8n file (n8n.mdx): Demonstrate n8n node creation using our payment API
+Custom frameworks (custom_frameworks.mdx): Generic integration guide for any framework
+Tools Section (docs/tools/)
+
+Clarify these are utilities/helpers, not standalone servers
+Show how tools work with the payment kernel
+Architecture Page (docs/architecture.mdx)
+
+Update to show: Payment Kernel → Framework Integration → Agent Implementation
+Remove any references to pre-built servers we don't actually have
+Examples Section (docs/examples/)
+
+Update examples to show integration patterns, not usage of existing servers
+Show code examples of integrating payment kernel into different frameworks
+Key Messaging Changes:
+From: "Use our MCP server"
+
+To: "Integrate our payment kernel to build your own MCP server"
+
+From: "Connect to our integrations"
+
+To: "Build integrations using our payment API and tools"
+
+The goal is accuracy - we provide the payment infrastructure and tools to build integrations, not ready-made servers for every framework.
