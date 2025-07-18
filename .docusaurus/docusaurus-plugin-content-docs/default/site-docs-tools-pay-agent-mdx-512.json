@@ -1,0 +1,24 @@
+{
+  "id": "tools/pay_agent",
+  "title": "🤝 Tool: pay_agent",
+  "description": "Use this tool to send payments between agents within the PayStabl ecosystem. This is ideal for agent-to-agent plugin usage, compute, data sharing, or tool access.",
+  "source": "@site/docs/tools/pay_agent.mdx",
+  "sourceDirName": "tools",
+  "slug": "/tools/pay_agent",
+  "permalink": "/tools/pay_agent",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/tools/pay_agent.mdx",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Agent-to-Agent Payment Examples",
+    "permalink": "/examples/agent_to_agent"
+  },
+  "next": {
+    "title": "🛠️ Tool: pay_api_endpoint",
+    "permalink": "/tools/pay_api_endpoint"
+  }
+}

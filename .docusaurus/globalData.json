@@ -1,0 +1,107 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/",
+          "mainDocId": "index",
+          "docs": [
+            {
+              "id": "architecture",
+              "path": "/architecture",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "examples/agent_to_agent",
+              "path": "/examples/agent_to_agent",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "examples/claude_demo",
+              "path": "/examples/claude_demo",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "examples/langgraph_retry",
+              "path": "/examples/langgraph_retry",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "index",
+              "path": "/"
+            },
+            {
+              "id": "integrations/custom_frameworks",
+              "path": "/integrations/custom_frameworks",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "integrations/langgraph",
+              "path": "/integrations/langgraph",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "integrations/mcp",
+              "path": "/integrations/mcp",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "integrations/n8n",
+              "path": "/integrations/n8n",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "introduction",
+              "path": "/introduction",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "quickstart",
+              "path": "/quickstart",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "reference/x402_headers",
+              "path": "/reference/x402_headers",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "security",
+              "path": "/security",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "testnets",
+              "path": "/testnets",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "tools/pay_agent",
+              "path": "/tools/pay_agent",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "tools/pay_api_endpoint",
+              "path": "/tools/pay_api_endpoint",
+              "sidebar": "tutorialSidebar"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "tutorialSidebar": {
+              "link": {
+                "path": "/introduction",
+                "label": "introduction"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "integrations/custom_frameworks",
+  "title": "Custom Framework Integration",
+  "description": "Build PayStabl integration for any AI framework or custom agent system using our SDKs and APIs. This guide covers implementation patterns, best practices, and examples for various agent architectures.",
+  "source": "@site/docs/integrations/custom_frameworks.mdx",
+  "sourceDirName": "integrations",
+  "slug": "/integrations/custom_frameworks",
+  "permalink": "/integrations/custom_frameworks",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/integrations/custom_frameworks.mdx",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "n8n Integration",
+    "permalink": "/integrations/n8n"
+  },
+  "next": {
+    "title": "Claude MCP Demo",
+    "permalink": "/examples/claude_demo"
+  }
+}

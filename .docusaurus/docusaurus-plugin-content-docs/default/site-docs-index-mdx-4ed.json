@@ -1,0 +1,15 @@
+{
+  "id": "index",
+  "title": "PayStabl Developer Documentation",
+  "description": "Welcome to PayStabl - the programmable wallet infrastructure for AI agents. Build autonomous payment flows that enable agents to pay for APIs, services, and each other seamlessly.",
+  "source": "@site/docs/index.mdx",
+  "sourceDirName": ".",
+  "slug": "/",
+  "permalink": "/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/index.mdx",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {}
+}

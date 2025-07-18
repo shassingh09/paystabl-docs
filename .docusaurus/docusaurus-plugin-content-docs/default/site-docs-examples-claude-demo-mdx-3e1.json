@@ -1,0 +1,24 @@
+{
+  "id": "examples/claude_demo",
+  "title": "Claude MCP Demo",
+  "description": "This demo showcases how Claude can use PayStabl to automatically handle payments for premium APIs through the Model Context Protocol (MCP) server integration.",
+  "source": "@site/docs/examples/claude_demo.mdx",
+  "sourceDirName": "examples",
+  "slug": "/examples/claude_demo",
+  "permalink": "/examples/claude_demo",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/examples/claude_demo.mdx",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Custom Framework Integration",
+    "permalink": "/integrations/custom_frameworks"
+  },
+  "next": {
+    "title": "LangGraph Payment Retry Example",
+    "permalink": "/examples/langgraph_retry"
+  }
+}

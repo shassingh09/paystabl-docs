@@ -1,0 +1,24 @@
+{
+  "id": "security",
+  "title": "Security Guide",
+  "description": "PayStabl implements enterprise-grade security to protect AI agents and their autonomous payment capabilities. This guide covers identity management, wallet security, policy enforcement, and compliance features.",
+  "source": "@site/docs/security.mdx",
+  "sourceDirName": ".",
+  "slug": "/security",
+  "permalink": "/security",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/security.mdx",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "x402 Headers Reference",
+    "permalink": "/reference/x402_headers"
+  },
+  "next": {
+    "title": "Testnet Development",
+    "permalink": "/testnets"
+  }
+}

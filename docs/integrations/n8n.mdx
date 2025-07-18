@@ -1,0 +1,669 @@
+# n8n Integration
+
+Integrate PayStabl with n8n workflows to add autonomous payment capabilities to your automation workflows. Enable bots to pay for premium APIs, compensate agents, and handle transaction flows seamlessly.
+
+## Quick Setup
+
+Install the PayStabl n8n community nodes:
+
+```bash
+# Install via n8n community nodes
+npm install n8n-nodes-paystabl
+```
+
+Or add via n8n interface:
+1. Go to Settings → Community Nodes
+2. Install: `n8n-nodes-paystabl`
+3. Restart n8n instance
+
+## Available Nodes
+
+### PayStabl API Payment Node
+
+Handle x402 payment requests automatically within your workflows:
+
+**Node Configuration:**
+- **Agent ID**: Your registered PayStabl agent identifier
+- **API URL**: Target endpoint that requires payment
+- **HTTP Method**: GET, POST, PUT, DELETE
+- **Request Body**: JSON payload for POST/PUT requests
+- **Headers**: Additional request headers
+- **Retry Settings**: Payment failure retry configuration
+
+**Example Workflow:**
+```
+Trigger → PayStabl API Payment → Process Response → Send Notification
+```
+
+### PayStabl Agent Payment Node
+
+Send payments between agents in your workflow:
+
+**Node Configuration:**
+- **From Agent**: Source agent ID
+- **To Agent**: Recipient agent ID  
+- **Amount**: Payment amount in USD
+- **Purpose**: Payment description
+- **Conditional**: Optional payment conditions
+
+### PayStabl Balance Check Node
+
+Monitor agent wallet balances and trigger actions:
+
+**Node Configuration:**
+- **Agent ID**: Agent to check balance for
+- **Threshold**: Minimum balance threshold
+- **Alert Settings**: Notification preferences
+
+## Example Workflows
+
+### Premium Data Processing Pipeline
+
+```json
+{
+  "name": "Premium Data Processing",
+  "nodes": [
+    {
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.cron",
+      "parameters": {
+        "triggerTimes": {
+          "mode": "everyMinute"
+        }
+      }
+    },
+    {
+      "name": "Check Balance",
+      "type": "n8n-nodes-paystabl.balance-check",
+      "parameters": {
+        "agentId": "data_processor",
+        "minimumBalance": "10.00"
+      }
+    },
+    {
+      "name": "Get Premium Data",
+      "type": "n8n-nodes-paystabl.api-payment", 
+      "parameters": {
+        "agentId": "data_processor",
+        "url": "https://premium-data.com/api/latest",
+        "method": "GET",
+        "retryOnFailure": true,
+        "maxRetries": 3
+      }
+    },
+    {
+      "name": "Process Data",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "// Process the paid data\nreturn items.map(item => ({\n  ...item,\n  processed: true,\n  timestamp: new Date().toISOString()\n}));"
+      }
+    },
+    {
+      "name": "Store Results",
+      "type": "n8n-nodes-base.postgres",
+      "parameters": {
+        "operation": "insert",
+        "table": "processed_data"
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [["Check Balance"]]
+    },
+    "Check Balance": {
+      "main": [["Get Premium Data"]]
+    },
+    "Get Premium Data": {
+      "main": [["Process Data"]]
+    },
+    "Process Data": {
+      "main": [["Store Results"]]
+    }
+  }
+}
+```
+
+### Agent Collaboration Workflow
+
+```json
+{
+  "name": "Multi-Agent Research",
+  "nodes": [
+    {
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "research-request"
+      }
+    },
+    {
+      "name": "Pay Research Agent",
+      "type": "n8n-nodes-paystabl.agent-payment",
+      "parameters": {
+        "fromAgentId": "coordinator",
+        "toAgentId": "research_specialist", 
+        "amount": "5.00",
+        "purpose": "Research task delegation"
+      }
+    },
+    {
+      "name": "Call Research Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "https://research-agent.com/api/analyze",
+        "method": "POST",
+        "headers": {
+          "X-PayStabl-Receipt": "={{ $node['Pay Research Agent'].json.receipt }}"
+        }
+      }
+    },
+    {
+      "name": "Pay Analysis Agent", 
+      "type": "n8n-nodes-paystabl.agent-payment",
+      "parameters": {
+        "fromAgentId": "coordinator",
+        "toAgentId": "analysis_agent",
+        "amount": "3.00",
+        "purpose": "Data analysis task"
+      }
+    },
+    {
+      "name": "Analyze Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "https://analysis-agent.com/api/process",
+        "method": "POST"
+      }
+    },
+    {
+      "name": "Return Results",
+      "type": "n8n-nodes-base.respond",
+      "parameters": {
+        "respondWith": "json"
+      }
+    }
+  ]
+}
+```
+
+### Cost Monitoring Workflow
+
+```json
+{
+  "name": "Daily Cost Monitoring",
+  "nodes": [
+    {
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.cron",
+      "parameters": {
+        "triggerTimes": {
+          "hour": 9,
+          "minute": 0
+        }
+      }
+    },
+    {
+      "name": "Get Agent Transactions",
+      "type": "n8n-nodes-paystabl.transaction-history",
+      "parameters": {
+        "agentId": "production_agent",
+        "timeframe": "24h",
+        "includeDetails": true
+      }
+    },
+    {
+      "name": "Calculate Daily Spend",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "const transactions = items[0].json.transactions;\nconst totalSpend = transactions.reduce((sum, tx) => sum + parseFloat(tx.amount), 0);\n\nreturn [{\n  json: {\n    dailySpend: totalSpend,\n    transactionCount: transactions.length,\n    averageTransaction: totalSpend / transactions.length,\n    highSpendAlert: totalSpend > 50\n  }\n}];"
+      }
+    },
+    {
+      "name": "Send Alert If High Spend",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.highSpendAlert }}",
+              "value2": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Send Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "parameters": {
+        "channel": "#alerts",
+        "text": "🚨 High agent spending detected: ${{ $node['Calculate Daily Spend'].json.dailySpend }}"
+      }
+    }
+  ]
+}
+```
+
+## Advanced Features
+
+### Conditional Payments
+
+Use n8n's IF node with PayStabl for conditional payment logic:
+
+```json
+{
+  "name": "Quality-Based Payment",
+  "nodes": [
+    {
+      "name": "Receive Task Result",
+      "type": "n8n-nodes-base.webhook"
+    },
+    {
+      "name": "Evaluate Quality",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "const quality = evaluateQuality(items[0].json.result);\nreturn [{ json: { qualityScore: quality, shouldPayBonus: quality > 0.9 } }];"
+      }
+    },
+    {
+      "name": "Check Quality Threshold", 
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.shouldPayBonus }}",
+              "value2": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Pay Bonus",
+      "type": "n8n-nodes-paystabl.agent-payment",
+      "parameters": {
+        "fromAgentId": "quality_assessor",
+        "toAgentId": "{{ $node['Receive Task Result'].json.agentId }}",
+        "amount": "2.00",
+        "purpose": "Quality bonus payment"
+      }
+    },
+    {
+      "name": "Pay Standard Fee",
+      "type": "n8n-nodes-paystabl.agent-payment", 
+      "parameters": {
+        "fromAgentId": "quality_assessor",
+        "toAgentId": "{{ $node['Receive Task Result'].json.agentId }}",
+        "amount": "1.00",
+        "purpose": "Standard task payment"
+      }
+    }
+  ]
+}
+```
+
+### Bulk Payment Processing
+
+Handle multiple payments efficiently:
+
+```json
+{
+  "name": "Bulk Agent Payments",
+  "nodes": [
+    {
+      "name": "Load Payment List",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "parameters": {
+        "fileFormat": "csv"
+      }
+    },
+    {
+      "name": "Process Each Payment",
+      "type": "n8n-nodes-base.itemLists",
+      "parameters": {
+        "operation": "splitOutItems"
+      }
+    },
+    {
+      "name": "Execute Payment",
+      "type": "n8n-nodes-paystabl.agent-payment",
+      "parameters": {
+        "fromAgentId": "payroll_agent",
+        "toAgentId": "={{ $json.agentId }}",
+        "amount": "={{ $json.amount }}",
+        "purpose": "={{ $json.description }}"
+      }
+    },
+    {
+      "name": "Log Results",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "// Log payment results for audit\nconst result = items[0].json;\nconsole.log(`Payment to ${result.toAgentId}: ${result.status}`);\nreturn items;"
+      }
+    }
+  ]
+}
+```
+
+## Error Handling
+
+### Payment Failure Recovery
+
+```json
+{
+  "name": "Robust Payment Workflow",
+  "nodes": [
+    {
+      "name": "Attempt Payment",
+      "type": "n8n-nodes-paystabl.api-payment",
+      "parameters": {
+        "agentId": "robust_agent",
+        "url": "https://premium-service.com/api",
+        "retryOnFailure": true,
+        "maxRetries": 3
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "name": "Check Payment Status",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "value2": "success"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Handle Payment Failure",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "const error = items[0].json.error;\nif (error.code === 'INSUFFICIENT_FUNDS') {\n  return [{ json: { action: 'request_funding', agentId: items[0].json.agentId } }];\n} else if (error.code === 'API_UNAVAILABLE') {\n  return [{ json: { action: 'try_fallback', fallbackUrl: 'https://backup-api.com' } }];\n}\nreturn [{ json: { action: 'alert_admin', error: error.message } }];"
+      }
+    },
+    {
+      "name": "Send Admin Alert",
+      "type": "n8n-nodes-base.email",
+      "parameters": {
+        "to": "admin@company.com",
+        "subject": "Payment Failure Alert",
+        "text": "Agent payment failed: {{ $json.error }}"
+      }
+    }
+  ]
+}
+```
+
+### Balance Monitoring and Auto-funding
+
+```json
+{
+  "name": "Auto-Fund Agent Wallet", 
+  "nodes": [
+    {
+      "name": "Check Balance Hourly",
+      "type": "n8n-nodes-base.cron",
+      "parameters": {
+        "triggerTimes": {
+          "minute": 0
+        }
+      }
+    },
+    {
+      "name": "Get Current Balance",
+      "type": "n8n-nodes-paystabl.balance-check",
+      "parameters": {
+        "agentId": "production_agent"
+      }
+    },
+    {
+      "name": "Check If Low Balance",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.balance }}",
+              "operation": "smaller",
+              "value2": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Transfer Funds",
+      "type": "n8n-nodes-paystabl.agent-payment",
+      "parameters": {
+        "fromAgentId": "treasury_agent",
+        "toAgentId": "production_agent", 
+        "amount": "50.00",
+        "purpose": "Auto-funding low balance"
+      }
+    },
+    {
+      "name": "Log Funding Event",
+      "type": "n8n-nodes-base.airtable",
+      "parameters": {
+        "operation": "create",
+        "table": "funding_log"
+      }
+    }
+  ]
+}
+```
+
+## Workflow Templates
+
+### Customer Service Bot
+
+Complete workflow for a customer service bot that can pay for premium services:
+
+```json
+{
+  "name": "AI Customer Service",
+  "description": "Customer service bot with payment capabilities",
+  "nodes": [
+    {
+      "name": "Customer Message",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "customer-chat"
+      }
+    },
+    {
+      "name": "Analyze Sentiment",
+      "type": "n8n-nodes-paystabl.api-payment",
+      "parameters": {
+        "agentId": "customer_service_bot",
+        "url": "https://sentiment-analysis.com/api",
+        "method": "POST",
+        "amount": "0.25"
+      }
+    },
+    {
+      "name": "Check If Escalation Needed",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.sentiment.anger }}",
+              "operation": "larger", 
+              "value2": 0.8
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Pay Human Agent",
+      "type": "n8n-nodes-paystabl.agent-payment",
+      "parameters": {
+        "fromAgentId": "customer_service_bot",
+        "toAgentId": "human_support_agent",
+        "amount": "15.00",
+        "purpose": "Escalated customer support"
+      }
+    },
+    {
+      "name": "Generate AI Response",
+      "type": "n8n-nodes-paystabl.api-payment",
+      "parameters": {
+        "agentId": "customer_service_bot",
+        "url": "https://ai-response.com/api",
+        "method": "POST",
+        "amount": "0.10"
+      }
+    }
+  ]
+}
+```
+
+### Research Automation
+
+Automated research workflow with multiple paid services:
+
+```json
+{
+  "name": "Automated Research Pipeline",
+  "nodes": [
+    {
+      "name": "Research Request",
+      "type": "n8n-nodes-base.webhook"
+    },
+    {
+      "name": "Academic Search",
+      "type": "n8n-nodes-paystabl.api-payment",
+      "parameters": {
+        "agentId": "research_bot",
+        "url": "https://academic-search.com/api",
+        "amount": "5.00"
+      }
+    },
+    {
+      "name": "Industry Analysis",
+      "type": "n8n-nodes-paystabl.agent-payment",
+      "parameters": {
+        "fromAgentId": "research_bot",
+        "toAgentId": "industry_analyst",
+        "amount": "10.00"
+      }
+    },
+    {
+      "name": "Generate Report",
+      "type": "n8n-nodes-paystabl.agent-payment",
+      "parameters": {
+        "fromAgentId": "research_bot", 
+        "toAgentId": "report_writer",
+        "amount": "8.00"
+      }
+    },
+    {
+      "name": "Deliver Results",
+      "type": "n8n-nodes-base.email"
+    }
+  ]
+}
+```
+
+## Best Practices
+
+### Workflow Design
+
+1. **Balance Checks**: Always check agent balance before expensive operations
+2. **Error Handling**: Implement proper error handling for payment failures
+3. **Logging**: Log all payment transactions for audit trails
+4. **Monitoring**: Set up alerts for unusual spending patterns
+5. **Fallbacks**: Have backup services in case primary payments fail
+
+### Security Considerations
+
+```json
+{
+  "name": "Secure Payment Workflow",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "nodes": [
+    {
+      "name": "Validate Request",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "// Validate payment request\nconst request = items[0].json;\nif (!request.agentId || !request.amount) {\n  throw new Error('Invalid payment request');\n}\nif (parseFloat(request.amount) > 100) {\n  throw new Error('Amount exceeds daily limit');\n}\nreturn items;"
+      }
+    },
+    {
+      "name": "Check Agent Authorization",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "https://auth-service.com/validate-agent",
+        "authentication": "headerAuth"
+      }
+    }
+  ]
+}
+```
+
+### Performance Optimization
+
+- Use batch operations for multiple payments
+- Implement caching for frequently accessed data
+- Set appropriate timeout values for API calls
+- Use webhook triggers instead of polling where possible
+
+## Troubleshooting
+
+### Common Issues
+
+**Payment Node Not Found**
+```bash
+# Reinstall PayStabl nodes
+npm uninstall n8n-nodes-paystabl
+npm install n8n-nodes-paystabl
+# Restart n8n
+```
+
+**Agent Authentication Failures**
+- Verify PayStabl API key in environment variables
+- Check agent ID spelling and case sensitivity
+- Ensure agent is properly registered in PayStabl
+
+**Payment Timeouts**
+- Increase timeout settings in node configuration
+- Check network connectivity to PayStabl services
+- Verify target API is responding correctly
+
+### Debug Mode
+
+Enable debug logging for PayStabl nodes:
+
+```bash
+# Set environment variable
+export N8N_LOG_LEVEL=debug
+export PAYSTABL_DEBUG=true
+
+# Start n8n with debug output
+n8n start --tunnel
+```
+
+## Related Documentation
+
+- [PayStabl API Reference](/docs/tools/pay_api_endpoint)
+- [Agent Payment Guide](/docs/tools/pay_agent)
+- [Security Guide](/docs/security)
+- [n8n Official Documentation](https://docs.n8n.io/)
+
+## Support
+
+- [GitHub Repository](https://github.com/paystabl/n8n-nodes)
+- [Discord Community](https://discord.gg/paystabl)
+- [Email Support](mailto:support@paystabl.com)

@@ -1,0 +1,843 @@
+# Security Guide
+
+PayStabl implements enterprise-grade security to protect AI agents and their autonomous payment capabilities. This guide covers identity management, wallet security, policy enforcement, and compliance features.
+
+## Identity and Authentication
+
+### Agent Identity Verification
+
+Each agent in PayStabl has a cryptographically verifiable identity:
+
+```typescript
+interface AgentIdentity {
+  agentId: string;                 // Unique agent identifier
+  publicKey: string;               // Agent's public key
+  signature: string;               // Identity signature
+  registrationHash: string;        // Registration proof
+  lastVerified: Date;             // Last identity verification
+  status: 'active' | 'suspended'; // Agent status
+}
+
+// Verify agent identity
+async function verifyAgentIdentity(agentId: string, signature: string): Promise<boolean> {
+  const agent = await getAgentById(agentId);
+  const message = `${agentId}:${Date.now()}`;
+  
+  return await cryptoVerifySignature(
+    message,
+    signature,
+    agent.publicKey
+  );
+}
+```
+
+**Identity Features:**
+- **Cryptographic Verification**: All agents use public-key cryptography
+- **Registration Proofs**: Immutable registration records on-chain
+- **Status Management**: Active monitoring of agent status
+- **Key Rotation**: Support for periodic key updates
+
+### API Key Management
+
+Secure API key handling for agent authentication:
+
+```typescript
+interface APIKeyManagement {
+  // Key generation
+  generateAPIKey(agentId: string, permissions: Permission[]): Promise<APIKey>;
+  
+  // Key validation
+  validateAPIKey(key: string): Promise<ValidationResult>;
+  
+  // Key lifecycle
+  rotateAPIKey(oldKey: string): Promise<APIKey>;
+  revokeAPIKey(key: string): Promise<void>;
+  
+  // Scope management
+  updateKeyPermissions(key: string, permissions: Permission[]): Promise<void>;
+}
+
+interface APIKey {
+  id: string;
+  agentId: string;
+  key: string;               // Hashed key value
+  permissions: Permission[];  // Allowed operations
+  expiresAt: Date;           // Key expiration
+  lastUsed: Date;            // Last usage timestamp
+  usage: UsageStats;         // Usage statistics
+}
+```
+
+**API Key Security:**
+- **Hashed Storage**: Keys are never stored in plaintext
+- **Scoped Permissions**: Keys have specific permission sets
+- **Automatic Expiration**: Time-based key expiration
+- **Usage Monitoring**: Track key usage patterns
+- **Rate Limiting**: Prevent abuse and brute force attacks
+
+## Wallet Security
+
+### Smart Wallet Architecture
+
+PayStabl uses Coinbase's smart wallet technology with enhanced security:
+
+```solidity
+contract SecureAgentWallet {
+    // Multi-signature support
+    mapping(address => bool) public signers;
+    uint256 public requiredSignatures;
+    
+    // Spending limits
+    mapping(address => uint256) public dailyLimits;
+    mapping(address => uint256) public dailySpent;
+    mapping(bytes32 => uint256) public lastResetTime;
+    
+    // Emergency controls
+    bool public emergencyStop;
+    address public emergencyContact;
+    
+    modifier onlyAuthorized() {
+        require(signers[msg.sender], "Unauthorized signer");
+        _;
+    }
+    
+    modifier notEmergencyStopped() {
+        require(!emergencyStop, "Emergency stop activated");
+        _;
+    }
+    
+    modifier withinDailyLimit(uint256 amount) {
+        bytes32 today = keccak256(abi.encodePacked(block.timestamp / 1 days));
+        
+        if (lastResetTime[today] == 0) {
+            dailySpent[msg.sender] = 0;
+            lastResetTime[today] = block.timestamp;
+        }
+        
+        require(
+            dailySpent[msg.sender] + amount <= dailyLimits[msg.sender],
+            "Daily limit exceeded"
+        );
+        _;
+    }
+    
+    function executeTransaction(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        bytes[] calldata signatures
+    ) external 
+      onlyAuthorized 
+      notEmergencyStopped 
+      withinDailyLimit(value) 
+    {
+        require(validateSignatures(signatures), "Invalid signatures");
+        
+        dailySpent[msg.sender] += value;
+        
+        (bool success,) = to.call{value: value}(data);
+        require(success, "Transaction failed");
+        
+        emit TransactionExecuted(to, value, data);
+    }
+}
+```
+
+### Private Key Management
+
+Secure private key handling for agent wallets:
+
+```typescript
+interface KeyManagement {
+  // Key generation
+  generateWalletKeys(): Promise<KeyPair>;
+  
+  // Secure storage
+  storePrivateKey(agentId: string, encryptedKey: string): Promise<void>;
+  retrievePrivateKey(agentId: string, decryptionKey: string): Promise<string>;
+  
+  // Key derivation
+  deriveChildKey(masterKey: string, path: string): Promise<string>;
+  
+  // Hardware wallet support
+  connectHardwareWallet(device: HardwareDevice): Promise<HardwareWallet>;
+  signWithHardware(wallet: HardwareWallet, transaction: Transaction): Promise<string>;
+}
+
+// Key encryption/decryption
+class SecureKeyStorage {
+  private encryptionKey: string;
+  
+  async encrypt(privateKey: string): Promise<string> {
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipher('aes-256-gcm', this.encryptionKey);
+    
+    let encrypted = cipher.update(privateKey, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    const authTag = cipher.getAuthTag();
+    
+    return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
+  }
+  
+  async decrypt(encryptedKey: string): Promise<string> {
+    const parts = encryptedKey.split(':');
+    const iv = Buffer.from(parts[0], 'hex');
+    const authTag = Buffer.from(parts[1], 'hex');
+    const encrypted = parts[2];
+    
+    const decipher = crypto.createDecipher('aes-256-gcm', this.encryptionKey);
+    decipher.setAuthTag(authTag);
+    
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  }
+}
+```
+
+### Multi-Signature Wallets
+
+Support for team-managed agent wallets:
+
+```typescript
+interface MultiSigWallet {
+  // Wallet configuration
+  owners: string[];              // List of owner addresses
+  requiredSignatures: number;    // Minimum signatures needed
+  
+  // Transaction management
+  proposeTransaction(transaction: Transaction): Promise<ProposalId>;
+  signTransaction(proposalId: ProposalId, signature: string): Promise<void>;
+  executeTransaction(proposalId: ProposalId): Promise<TransactionHash>;
+  
+  // Owner management
+  addOwner(newOwner: string): Promise<void>;
+  removeOwner(owner: string): Promise<void>;
+  changeRequirement(newRequirement: number): Promise<void>;
+}
+
+class MultiSigManager {
+  async createMultiSigWallet(
+    agentId: string, 
+    owners: string[], 
+    requiredSigs: number
+  ): Promise<MultiSigWallet> {
+    const wallet = await deployMultiSigContract({
+      owners,
+      requiredSignatures: requiredSigs,
+      agentId
+    });
+    
+    await this.registerWallet(agentId, wallet.address);
+    
+    return wallet;
+  }
+  
+  async proposeAgentPayment(
+    walletAddress: string,
+    toAgent: string,
+    amount: string,
+    purpose: string
+  ): Promise<string> {
+    const transaction = {
+      to: toAgent,
+      value: amount,
+      data: encodePaymentData(purpose)
+    };
+    
+    return await this.proposeTransaction(walletAddress, transaction);
+  }
+}
+```
+
+## Policy Engine Security
+
+### Spending Controls
+
+Comprehensive spending limit enforcement:
+
+```typescript
+interface SpendingPolicies {
+  // Limit types
+  dailyLimit: string;
+  weeklyLimit: string;
+  monthlyLimit: string;
+  perTransactionLimit: string;
+  
+  // Time-based controls
+  allowedHours: number[];        // Allowed hours (0-23)
+  allowedDays: number[];         // Allowed days (0-6, Sunday=0)
+  timezone: string;              // Timezone for time checks
+  
+  // Velocity controls
+  maxTransactionsPerHour: number;
+  maxTransactionsPerDay: number;
+  cooldownPeriod: number;        // Seconds between transactions
+  
+  // Risk controls
+  suspiciousAmountThreshold: string;
+  velocityAlertThreshold: number;
+  emergencyStopEnabled: boolean;
+}
+
+class PolicyEnforcement {
+  async validateTransaction(
+    agentId: string, 
+    transaction: Transaction
+  ): Promise<ValidationResult> {
+    const policies = await this.getPolicies(agentId);
+    const validations = await Promise.all([
+      this.checkSpendingLimits(agentId, transaction.amount, policies),
+      this.checkTimeRestrictions(policies),
+      this.checkVelocityLimits(agentId, policies),
+      this.checkSuspiciousActivity(agentId, transaction, policies)
+    ]);
+    
+    const failed = validations.filter(v => !v.valid);
+    
+    return {
+      valid: failed.length === 0,
+      errors: failed.map(f => f.error),
+      requiresApproval: failed.some(f => f.requiresApproval)
+    };
+  }
+  
+  async checkSpendingLimits(
+    agentId: string, 
+    amount: string, 
+    policies: SpendingPolicies
+  ): Promise<ValidationResult> {
+    const currentSpend = await this.getCurrentSpending(agentId);
+    
+    // Check per-transaction limit
+    if (parseFloat(amount) > parseFloat(policies.perTransactionLimit)) {
+      return {
+        valid: false,
+        error: "Transaction exceeds per-transaction limit",
+        requiresApproval: true
+      };
+    }
+    
+    // Check daily limit
+    if (currentSpend.daily + parseFloat(amount) > parseFloat(policies.dailyLimit)) {
+      return {
+        valid: false,
+        error: "Transaction would exceed daily limit",
+        requiresApproval: false
+      };
+    }
+    
+    return { valid: true };
+  }
+}
+```
+
+### Allowlist Management
+
+Control which services agents can pay:
+
+```typescript
+interface AllowlistManager {
+  // Domain management
+  addAllowedDomain(agentId: string, domain: string): Promise<void>;
+  removeAllowedDomain(agentId: string, domain: string): Promise<void>;
+  isDomainAllowed(agentId: string, domain: string): Promise<boolean>;
+  
+  // Agent management
+  addAllowedAgent(agentId: string, targetAgent: string): Promise<void>;
+  removeAllowedAgent(agentId: string, targetAgent: string): Promise<void>;
+  isAgentAllowed(agentId: string, targetAgent: string): Promise<boolean>;
+  
+  // Bulk operations
+  importAllowlist(agentId: string, entries: AllowlistEntry[]): Promise<void>;
+  exportAllowlist(agentId: string): Promise<AllowlistEntry[]>;
+}
+
+interface AllowlistEntry {
+  type: 'domain' | 'agent' | 'contract';
+  value: string;
+  addedAt: Date;
+  addedBy: string;
+  expires?: Date;
+  metadata?: Record<string, any>;
+}
+
+class SmartAllowlist {
+  // Machine learning-based allowlist suggestions
+  async suggestAllowlistAdditions(agentId: string): Promise<Suggestion[]> {
+    const recentActivity = await this.getRecentActivity(agentId);
+    const patterns = await this.analyzePatterns(recentActivity);
+    
+    return patterns
+      .filter(p => p.confidence > 0.8)
+      .map(p => ({
+        type: 'suggestion',
+        value: p.domain || p.agent,
+        confidence: p.confidence,
+        reason: p.reason
+      }));
+  }
+  
+  // Temporary allowlist entries
+  async addTemporaryEntry(
+    agentId: string, 
+    entry: AllowlistEntry, 
+    durationMinutes: number
+  ): Promise<void> {
+    const expires = new Date(Date.now() + durationMinutes * 60 * 1000);
+    
+    await this.addEntry(agentId, {
+      ...entry,
+      expires,
+      metadata: { temporary: true }
+    });
+    
+    // Schedule cleanup
+    setTimeout(() => {
+      this.removeExpiredEntries(agentId);
+    }, durationMinutes * 60 * 1000);
+  }
+}
+```
+
+## Fraud Detection and Prevention
+
+### Suspicious Activity Detection
+
+ML-powered fraud detection:
+
+```typescript
+interface FraudDetection {
+  // Pattern analysis
+  analyzeTransactionPattern(agentId: string, transaction: Transaction): Promise<RiskScore>;
+  detectAnomalousActivity(agentId: string): Promise<Anomaly[]>;
+  
+  // Real-time monitoring
+  monitorTransactionVelocity(agentId: string): Promise<VelocityAlert[]>;
+  checkForSuspiciousRecipients(recipient: string): Promise<RecipientRisk>;
+  
+  // Machine learning
+  trainFraudModel(trainingData: TransactionData[]): Promise<ModelMetrics>;
+  updateRiskScoring(agentId: string, feedback: FraudFeedback): Promise<void>;
+}
+
+class FraudPreventionEngine {
+  private model: MLModel;
+  
+  async evaluateTransaction(
+    agentId: string, 
+    transaction: Transaction
+  ): Promise<FraudAssessment> {
+    const features = await this.extractFeatures(agentId, transaction);
+    const riskScore = await this.model.predict(features);
+    
+    const assessment: FraudAssessment = {
+      riskScore,
+      riskLevel: this.categorizeRisk(riskScore),
+      flags: this.identifyRiskFlags(features),
+      recommendation: this.getRecommendation(riskScore)
+    };
+    
+    if (assessment.riskLevel === 'HIGH') {
+      await this.triggerAlert(agentId, transaction, assessment);
+    }
+    
+    return assessment;
+  }
+  
+  private async extractFeatures(
+    agentId: string, 
+    transaction: Transaction
+  ): Promise<FeatureVector> {
+    const history = await this.getTransactionHistory(agentId);
+    const agentProfile = await this.getAgentProfile(agentId);
+    
+    return {
+      // Transaction features
+      amount: parseFloat(transaction.amount),
+      recipientType: transaction.recipientType,
+      timeOfDay: new Date().getHours(),
+      dayOfWeek: new Date().getDay(),
+      
+      // Historical features
+      avgTransactionAmount: this.calculateAverage(history.amounts),
+      transactionFrequency: history.frequency,
+      recipientDiversity: this.calculateRecipientDiversity(history),
+      
+      // Agent features
+      agentAge: agentProfile.ageInDays,
+      totalVolume: agentProfile.totalVolume,
+      reputationScore: agentProfile.reputation
+    };
+  }
+}
+```
+
+### Rate Limiting and Abuse Prevention
+
+Prevent abuse and ensure fair usage:
+
+```typescript
+interface RateLimiting {
+  // Request limiting
+  checkRateLimit(agentId: string, operation: string): Promise<RateLimitResult>;
+  updateRateLimit(agentId: string, operation: string): Promise<void>;
+  
+  // Adaptive limiting
+  adjustLimitsBasedOnBehavior(agentId: string): Promise<void>;
+  
+  // Circuit breaker
+  checkCircuitBreaker(service: string): Promise<CircuitState>;
+  reportServiceFailure(service: string): Promise<void>;
+}
+
+class AdaptiveRateLimiter {
+  private limits: Map<string, RateLimit> = new Map();
+  
+  async checkAndUpdateLimit(
+    agentId: string, 
+    operation: string
+  ): Promise<RateLimitResult> {
+    const key = `${agentId}:${operation}`;
+    const limit = this.limits.get(key) || this.getDefaultLimit(operation);
+    
+    const now = Date.now();
+    const windowStart = Math.floor(now / limit.windowMs) * limit.windowMs;
+    
+    if (limit.windowStart !== windowStart) {
+      // Reset window
+      limit.count = 0;
+      limit.windowStart = windowStart;
+    }
+    
+    if (limit.count >= limit.maxRequests) {
+      return {
+        allowed: false,
+        remainingRequests: 0,
+        resetTime: windowStart + limit.windowMs
+      };
+    }
+    
+    limit.count++;
+    this.limits.set(key, limit);
+    
+    return {
+      allowed: true,
+      remainingRequests: limit.maxRequests - limit.count,
+      resetTime: windowStart + limit.windowMs
+    };
+  }
+}
+```
+
+## Audit and Compliance
+
+### Transaction Logging
+
+Comprehensive audit trails for all activities:
+
+```typescript
+interface AuditLogger {
+  // Transaction logging
+  logTransaction(transaction: TransactionLog): Promise<void>;
+  logPolicyViolation(violation: PolicyViolation): Promise<void>;
+  logSecurityEvent(event: SecurityEvent): Promise<void>;
+  
+  // Query interface
+  searchLogs(criteria: SearchCriteria): Promise<LogEntry[]>;
+  generateReport(reportType: ReportType, period: TimePeriod): Promise<Report>;
+  
+  // Compliance features
+  exportComplianceData(agentId: string, format: ExportFormat): Promise<Buffer>;
+  anonymizeLogsForPrivacy(criteria: AnonymizationCriteria): Promise<void>;
+}
+
+interface TransactionLog {
+  id: string;
+  agentId: string;
+  timestamp: Date;
+  transactionType: 'api_payment' | 'agent_payment';
+  amount: string;
+  recipient: string;
+  purpose: string;
+  status: 'pending' | 'completed' | 'failed';
+  txHash?: string;
+  errorReason?: string;
+  policyChecks: PolicyCheck[];
+  riskAssessment: RiskAssessment;
+  userContext?: string;
+}
+
+class ComplianceEngine {
+  async generateComplianceReport(
+    agentId: string, 
+    period: TimePeriod
+  ): Promise<ComplianceReport> {
+    const transactions = await this.getTransactions(agentId, period);
+    const violations = await this.getPolicyViolations(agentId, period);
+    const securityEvents = await this.getSecurityEvents(agentId, period);
+    
+    return {
+      agentId,
+      period,
+      summary: {
+        totalTransactions: transactions.length,
+        totalVolume: this.calculateTotalVolume(transactions),
+        successRate: this.calculateSuccessRate(transactions),
+        violationCount: violations.length,
+        securityIncidents: securityEvents.length
+      },
+      transactions: transactions.map(this.sanitizeForCompliance),
+      violations,
+      recommendations: await this.generateRecommendations(agentId),
+      generatedAt: new Date()
+    };
+  }
+  
+  async detectComplianceIssues(agentId: string): Promise<ComplianceIssue[]> {
+    const issues: ComplianceIssue[] = [];
+    
+    // Check for suspicious patterns
+    const patterns = await this.analyzeTransactionPatterns(agentId);
+    if (patterns.suspiciousActivity) {
+      issues.push({
+        type: 'suspicious_activity',
+        severity: 'high',
+        description: 'Unusual transaction patterns detected',
+        recommendation: 'Review recent transactions and adjust policies'
+      });
+    }
+    
+    // Check policy compliance
+    const policyCompliance = await this.checkPolicyCompliance(agentId);
+    if (!policyCompliance.compliant) {
+      issues.push({
+        type: 'policy_violation',
+        severity: 'medium',
+        description: 'Agent policies may need updates',
+        recommendation: 'Review and update spending policies'
+      });
+    }
+    
+    return issues;
+  }
+}
+```
+
+### Data Privacy and Protection
+
+GDPR and privacy compliance features:
+
+```typescript
+interface PrivacyManager {
+  // Data subject rights
+  handleDataAccessRequest(agentId: string): Promise<PersonalDataExport>;
+  handleDataDeletionRequest(agentId: string): Promise<DeletionResult>;
+  handleDataPortabilityRequest(agentId: string): Promise<PortabilityExport>;
+  
+  // Anonymization
+  anonymizeTransactionData(agentId: string): Promise<void>;
+  pseudonymizeAgentData(agentId: string): Promise<string>;
+  
+  // Retention management
+  applyRetentionPolicies(): Promise<RetentionResult>;
+  scheduleDataDeletion(agentId: string, deletionDate: Date): Promise<void>;
+}
+
+class PrivacyComplianceEngine {
+  async processDataDeletionRequest(agentId: string): Promise<DeletionResult> {
+    // Identify all data associated with the agent
+    const dataLocations = await this.findAgentData(agentId);
+    
+    // Check if deletion is permitted
+    const canDelete = await this.checkDeletionPermissions(agentId);
+    if (!canDelete.permitted) {
+      return {
+        success: false,
+        reason: canDelete.reason,
+        alternatives: canDelete.alternatives
+      };
+    }
+    
+    // Perform deletion
+    const deletionResults = await Promise.all(
+      dataLocations.map(location => this.deleteDataAtLocation(location))
+    );
+    
+    // Log deletion for audit
+    await this.logDataDeletion(agentId, deletionResults);
+    
+    return {
+      success: true,
+      deletedItems: deletionResults.length,
+      completedAt: new Date()
+    };
+  }
+  
+  async anonymizeForAnalytics(
+    transactions: Transaction[]
+  ): Promise<AnonymizedTransaction[]> {
+    return transactions.map(tx => ({
+      id: this.generateAnonymousId(tx.id),
+      timestamp: tx.timestamp,
+      amount: this.bucketAmount(tx.amount), // Bucket amounts for privacy
+      transactionType: tx.transactionType,
+      // Remove identifying information
+      agentId: undefined,
+      recipient: undefined,
+      purpose: undefined
+    }));
+  }
+}
+```
+
+## Security Best Practices
+
+### Development Security
+
+Secure development practices for PayStabl integrations:
+
+```typescript
+// Secure coding guidelines
+class SecureDevelopment {
+  // Input validation
+  validateInput(input: any, schema: ValidationSchema): ValidationResult {
+    // Use strong input validation
+    return validate(input, schema);
+  }
+  
+  // Secure random generation
+  generateSecureRandom(length: number): string {
+    return crypto.randomBytes(length).toString('hex');
+  }
+  
+  // Safe string comparison
+  safeCompare(a: string, b: string): boolean {
+    // Use constant-time comparison to prevent timing attacks
+    return crypto.timingSafeEqual(
+      Buffer.from(a, 'utf8'),
+      Buffer.from(b, 'utf8')
+    );
+  }
+  
+  // Secure error handling
+  handleError(error: Error, context: string): SafeError {
+    // Log full error internally
+    logger.error(error, { context });
+    
+    // Return sanitized error to user
+    return {
+      message: "An error occurred",
+      code: error.name,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+```
+
+### Deployment Security
+
+Security considerations for production deployments:
+
+```yaml
+# Security checklist for deployment
+security_checklist:
+  network:
+    - Use HTTPS/TLS 1.3 for all connections
+    - Implement proper firewall rules
+    - Use VPN for internal communication
+    - Enable DDoS protection
+  
+  infrastructure:
+    - Keep systems updated with security patches
+    - Use container security scanning
+    - Implement network segmentation
+    - Monitor for intrusions
+  
+  application:
+    - Enable security headers (HSTS, CSP, etc.)
+    - Implement proper session management
+    - Use secure authentication mechanisms
+    - Validate all inputs
+  
+  data:
+    - Encrypt data at rest and in transit
+    - Implement proper backup encryption
+    - Use secure key management
+    - Regular security audits
+```
+
+## Incident Response
+
+### Security Incident Handling
+
+Procedures for handling security incidents:
+
+```typescript
+interface IncidentResponse {
+  // Incident detection
+  detectIncident(alerts: SecurityAlert[]): Promise<Incident | null>;
+  classifyIncident(incident: Incident): Promise<IncidentClassification>;
+  
+  // Response procedures
+  containIncident(incident: Incident): Promise<ContainmentResult>;
+  investigateIncident(incident: Incident): Promise<InvestigationReport>;
+  
+  // Recovery and lessons learned
+  recoverFromIncident(incident: Incident): Promise<RecoveryResult>;
+  documentLessonsLearned(incident: Incident): Promise<void>;
+}
+
+class SecurityIncidentManager {
+  async handleSecurityIncident(incident: SecurityIncident): Promise<void> {
+    // Immediate response
+    await this.alertSecurityTeam(incident);
+    await this.implementEmergencyMeasures(incident);
+    
+    // Investigation
+    const investigation = await this.conductInvestigation(incident);
+    
+    // Containment
+    await this.containThreat(incident, investigation);
+    
+    // Recovery
+    await this.recoverSystems(incident);
+    
+    // Post-incident
+    await this.updateSecurityMeasures(incident, investigation);
+    await this.documentIncident(incident, investigation);
+  }
+  
+  private async implementEmergencyMeasures(incident: SecurityIncident): Promise<void> {
+    switch (incident.type) {
+      case 'unauthorized_access':
+        await this.revokeCompromisedKeys(incident.affectedAgents);
+        break;
+      case 'suspicious_transactions':
+        await this.freezeAffectedWallets(incident.affectedWallets);
+        break;
+      case 'policy_bypass':
+        await this.strengthenPolicies(incident.affectedPolicies);
+        break;
+    }
+  }
+}
+```
+
+## Related Documentation
+
+- [Architecture Guide](/docs/architecture) - System architecture overview
+- [API Reference](/docs/reference/x402_headers) - Technical API details
+- [Quickstart Guide](/docs/quickstart) - Getting started securely
+- [Integration Guides](/docs/integrations/mcp) - Secure framework integration
+
+## Support
+
+For security issues or questions:
+
+- **Security Email**: [security@paystabl.com](mailto:security@paystabl.com)
+- **Bug Bounty Program**: [https://paystabl.com/security/bounty](https://paystabl.com/security/bounty)
+- **Discord Security Channel**: [#security on Discord](https://discord.gg/paystabl)
+- **Emergency Hotline**: Available 24/7 for critical security issues

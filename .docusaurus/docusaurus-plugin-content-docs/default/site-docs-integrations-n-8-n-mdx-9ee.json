@@ -1,0 +1,24 @@
+{
+  "id": "integrations/n8n",
+  "title": "n8n Integration",
+  "description": "Integrate PayStabl with n8n workflows to add autonomous payment capabilities to your automation workflows. Enable bots to pay for premium APIs, compensate agents, and handle transaction flows seamlessly.",
+  "source": "@site/docs/integrations/n8n.mdx",
+  "sourceDirName": "integrations",
+  "slug": "/integrations/n8n",
+  "permalink": "/integrations/n8n",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/integrations/n8n.mdx",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "LangGraph Integration",
+    "permalink": "/integrations/langgraph"
+  },
+  "next": {
+    "title": "Custom Framework Integration",
+    "permalink": "/integrations/custom_frameworks"
+  }
+}

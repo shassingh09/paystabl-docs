@@ -1,0 +1,834 @@
+# Testnet Development
+
+Develop and test your PayStabl agent integrations on testnets before deploying to production. This guide covers testnet setup, faucets, debugging tools, and best practices for agent development.
+
+## Supported Testnets
+
+### Base Sepolia (Primary)
+
+PayStabl's primary testnet environment runs on Base Sepolia:
+
+**Network Details:**
+- **Name**: Base Sepolia
+- **Chain ID**: 84532
+- **RPC URL**: `https://sepolia.base.org`
+- **Explorer**: [https://sepolia.basescan.org](https://sepolia.basescan.org)
+- **Currency**: ETH (Testnet)
+
+**Quick Setup:**
+```javascript
+import { PayStablAgent } from '@paystabl/sdk';
+
+const agent = new PayStablAgent({
+  agentId: "test_agent_001",
+  apiKey: process.env.PAYSTABL_API_KEY,
+  network: "base-sepolia"  // Use testnet
+});
+```
+
+### Ethereum Sepolia (Secondary)
+
+For broader Ethereum ecosystem testing:
+
+**Network Details:**
+- **Name**: Ethereum Sepolia
+- **Chain ID**: 11155111
+- **RPC URL**: `https://sepolia.infura.io/v3/YOUR-API-KEY`
+- **Explorer**: [https://sepolia.etherscan.io](https://sepolia.etherscan.io)
+- **Currency**: ETH (Testnet)
+
+## Getting Testnet Funds
+
+### Base Sepolia Faucet
+
+Multiple options for getting Base Sepolia ETH:
+
+**Option 1: Coinbase Faucet**
+```bash
+curl -X POST https://faucet.quicknode.com/base/sepolia \
+  -H "Content-Type: application/json" \
+  -d '{
+    "address": "YOUR_WALLET_ADDRESS",
+    "amount": "0.5"
+  }'
+```
+
+**Option 2: Web Interface**
+1. Visit [Coinbase Base Faucet](https://faucet.quicknode.com/base/sepolia)
+2. Connect your wallet or enter address
+3. Request testnet ETH (up to 0.5 ETH per day)
+
+**Option 3: Discord Faucet**
+1. Join the [Base Discord](https://discord.gg/buildonbase)
+2. Use the `!faucet YOUR_ADDRESS` command in #faucet channel
+
+### Automated Faucet Integration
+
+Integrate faucet requests into your development workflow:
+
+```javascript
+class TestnetManager {
+  async ensureFunding(agentId: string, minimumBalance: string = "0.1") {
+    const agent = new PayStablAgent({ agentId, network: "base-sepolia" });
+    const balance = await agent.getBalance();
+    
+    if (parseFloat(balance.eth) < parseFloat(minimumBalance)) {
+      console.log(`Agent ${agentId} needs funding. Current balance: ${balance.eth} ETH`);
+      
+      // Request from faucet
+      const wallet = await agent.getWallet();
+      await this.requestFaucetFunds(wallet.address);
+      
+      // Wait for funding to arrive
+      await this.waitForFunding(agentId, minimumBalance);
+    }
+  }
+  
+  async requestFaucetFunds(address: string): Promise<void> {
+    try {
+      const response = await fetch('https://faucet.quicknode.com/base/sepolia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, amount: "0.5" })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Faucet request failed: ${response.statusText}`);
+      }
+      
+      console.log(`Faucet request successful for ${address}`);
+    } catch (error) {
+      console.error('Faucet request failed:', error.message);
+      console.log('Please manually request funds from https://faucet.quicknode.com/base/sepolia');
+    }
+  }
+  
+  async waitForFunding(agentId: string, targetBalance: string): Promise<void> {
+    const agent = new PayStablAgent({ agentId, network: "base-sepolia" });
+    const maxWaitTime = 60000; // 1 minute
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < maxWaitTime) {
+      const balance = await agent.getBalance();
+      
+      if (parseFloat(balance.eth) >= parseFloat(targetBalance)) {
+        console.log(`Funding received! New balance: ${balance.eth} ETH`);
+        return;
+      }
+      
+      console.log(`Waiting for funding... Current: ${balance.eth} ETH`);
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+    }
+    
+    throw new Error('Funding timeout - please check faucet request');
+  }
+}
+```
+
+## Development Environment Setup
+
+### Environment Configuration
+
+Set up environment variables for testnet development:
+
+```bash
+# .env.development
+PAYSTABL_API_KEY=your_testnet_api_key
+PAYSTABL_NETWORK=base-sepolia
+PAYSTABL_DEBUG=true
+
+# Agent configuration
+AGENT_ID=dev_agent_001
+AGENT_NAME="Development Agent"
+
+# Testnet settings
+TESTNET_FAUCET_URL=https://faucet.quicknode.com/base/sepolia
+TESTNET_EXPLORER=https://sepolia.basescan.org
+```
+
+### Development Scripts
+
+Useful scripts for testnet development:
+
+```json
+{
+  "scripts": {
+    "dev:testnet": "NODE_ENV=development npm run start",
+    "test:agent": "node scripts/test-agent.js",
+    "fund:agent": "node scripts/fund-agent.js",
+    "check:balance": "node scripts/check-balance.js",
+    "deploy:testnet": "node scripts/deploy-testnet.js"
+  }
+}
+```
+
+**test-agent.js:**
+```javascript
+const { PayStablAgent } = require('@paystabl/sdk');
+
+async function testAgent() {
+  const agent = new PayStablAgent({
+    agentId: "test_agent_dev",
+    network: "base-sepolia"
+  });
+  
+  // Test basic functionality
+  console.log('Testing agent wallet...');
+  const balance = await agent.getBalance();
+  console.log(`Balance: ${balance.eth} ETH`);
+  
+  // Test API payment
+  console.log('Testing API payment...');
+  try {
+    const payment = await agent.pay_api_endpoint({
+      url: "https://test-402-api.paystabl.com/test-endpoint",
+      method: "GET"
+    });
+    console.log('API payment successful:', payment.receipt.txHash);
+  } catch (error) {
+    console.error('API payment failed:', error.message);
+  }
+  
+  // Test agent payment
+  console.log('Testing agent payment...');
+  try {
+    const payment = await agent.pay_agent({
+      fromAgentId: "test_agent_dev",
+      toAgentId: "test_recipient_agent",
+      amount: "0.01",
+      purpose: "Development test"
+    });
+    console.log('Agent payment successful:', payment.txHash);
+  } catch (error) {
+    console.error('Agent payment failed:', error.message);
+  }
+}
+
+testAgent().catch(console.error);
+```
+
+## Testing Scenarios
+
+### API Payment Testing
+
+Test x402 protocol handling with test APIs:
+
+```javascript
+class APIPaymentTester {
+  constructor(agentId) {
+    this.agent = new PayStablAgent({
+      agentId,
+      network: "base-sepolia"
+    });
+  }
+  
+  async testBasicAPIPayment() {
+    console.log('Testing basic API payment flow...');
+    
+    const testAPI = "https://test-402-api.paystabl.com/basic-test";
+    
+    try {
+      // This will trigger a 402 response and handle payment
+      const result = await this.agent.pay_api_endpoint({
+        url: testAPI,
+        method: "GET"
+      });
+      
+      console.log('✅ Basic API payment successful');
+      console.log('Payment amount:', result.receipt.amount);
+      console.log('Transaction hash:', result.receipt.txHash);
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Basic API payment failed:', error.message);
+      throw error;
+    }
+  }
+  
+  async testPostAPIPayment() {
+    console.log('Testing POST API payment with data...');
+    
+    const testAPI = "https://test-402-api.paystabl.com/post-test";
+    const testData = {
+      query: "test query",
+      parameters: { limit: 10 }
+    };
+    
+    try {
+      const result = await this.agent.pay_api_endpoint({
+        url: testAPI,
+        method: "POST",
+        data: testData,
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+      
+      console.log('✅ POST API payment successful');
+      return result;
+    } catch (error) {
+      console.error('❌ POST API payment failed:', error.message);
+      throw error;
+    }
+  }
+  
+  async testErrorHandling() {
+    console.log('Testing payment error handling...');
+    
+    // Test with insufficient funds
+    const expensiveAPI = "https://test-402-api.paystabl.com/expensive-test";
+    
+    try {
+      await this.agent.pay_api_endpoint({
+        url: expensiveAPI,
+        method: "GET"
+      });
+      
+      console.log('⚠️ Expected error but payment succeeded');
+    } catch (error) {
+      if (error.code === 'INSUFFICIENT_FUNDS') {
+        console.log('✅ Insufficient funds error handled correctly');
+      } else {
+        console.error('❌ Unexpected error:', error.message);
+      }
+    }
+  }
+}
+```
+
+### Agent-to-Agent Testing
+
+Test payments between different agents:
+
+```javascript
+class AgentCollaborationTester {
+  constructor() {
+    this.agentA = new PayStablAgent({
+      agentId: "test_agent_a",
+      network: "base-sepolia"
+    });
+    
+    this.agentB = new PayStablAgent({
+      agentId: "test_agent_b", 
+      network: "base-sepolia"
+    });
+  }
+  
+  async setupTestAgents() {
+    console.log('Setting up test agents...');
+    
+    // Ensure both agents have funding
+    const balanceA = await this.agentA.getBalance();
+    const balanceB = await this.agentB.getBalance();
+    
+    console.log(`Agent A balance: ${balanceA.eth} ETH`);
+    console.log(`Agent B balance: ${balanceB.eth} ETH`);
+    
+    if (parseFloat(balanceA.eth) < 0.1 || parseFloat(balanceB.eth) < 0.1) {
+      throw new Error('Agents need more funding for testing');
+    }
+  }
+  
+  async testSimplePayment() {
+    console.log('Testing simple agent-to-agent payment...');
+    
+    const initialBalanceB = await this.agentB.getBalance();
+    
+    const payment = await this.agentA.pay_agent({
+      fromAgentId: "test_agent_a",
+      toAgentId: "test_agent_b",
+      amount: "0.05",
+      purpose: "Test payment"
+    });
+    
+    console.log('✅ Payment sent:', payment.txHash);
+    
+    // Wait for confirmation
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    const finalBalanceB = await this.agentB.getBalance();
+    const received = parseFloat(finalBalanceB.eth) - parseFloat(initialBalanceB.eth);
+    
+    console.log(`Agent B received: ${received} ETH`);
+    
+    return payment;
+  }
+  
+  async testBatchPayments() {
+    console.log('Testing batch payments...');
+    
+    const payments = await Promise.all([
+      this.agentA.pay_agent({
+        fromAgentId: "test_agent_a",
+        toAgentId: "test_agent_b",
+        amount: "0.01",
+        purpose: "Batch payment 1"
+      }),
+      this.agentA.pay_agent({
+        fromAgentId: "test_agent_a", 
+        toAgentId: "test_agent_b",
+        amount: "0.02",
+        purpose: "Batch payment 2"
+      }),
+      this.agentA.pay_agent({
+        fromAgentId: "test_agent_a",
+        toAgentId: "test_agent_b", 
+        amount: "0.03",
+        purpose: "Batch payment 3"
+      })
+    ]);
+    
+    console.log(`✅ Sent ${payments.length} batch payments`);
+    return payments;
+  }
+}
+```
+
+## Debugging and Monitoring
+
+### Debug Mode
+
+Enable detailed logging for development:
+
+```javascript
+const agent = new PayStablAgent({
+  agentId: "debug_agent",
+  network: "base-sepolia",
+  debug: true,  // Enable debug logging
+  logLevel: "verbose"
+});
+
+// Custom logger
+agent.on('payment_started', (event) => {
+  console.log(`🔄 Payment started: ${event.amount} to ${event.recipient}`);
+});
+
+agent.on('payment_completed', (event) => {
+  console.log(`✅ Payment completed: ${event.txHash}`);
+});
+
+agent.on('payment_failed', (event) => {
+  console.error(`❌ Payment failed: ${event.error}`);
+});
+
+agent.on('policy_check', (event) => {
+  console.log(`🔍 Policy check: ${event.policy} - ${event.result}`);
+});
+```
+
+### Transaction Monitoring
+
+Monitor testnet transactions in real-time:
+
+```javascript
+class TestnetMonitor {
+  constructor(agentId) {
+    this.agentId = agentId;
+    this.agent = new PayStablAgent({
+      agentId,
+      network: "base-sepolia"
+    });
+  }
+  
+  async startMonitoring() {
+    console.log(`Starting monitoring for agent: ${this.agentId}`);
+    
+    // Monitor balance changes
+    setInterval(async () => {
+      const balance = await this.agent.getBalance();
+      console.log(`[${new Date().toISOString()}] Balance: ${balance.eth} ETH`);
+    }, 30000); // Every 30 seconds
+    
+    // Monitor transaction history
+    setInterval(async () => {
+      const recent = await this.agent.getTransactions({
+        limit: 5,
+        since: new Date(Date.now() - 5 * 60 * 1000) // Last 5 minutes
+      });
+      
+      if (recent.length > 0) {
+        console.log(`[${new Date().toISOString()}] Recent transactions:`);
+        recent.forEach(tx => {
+          console.log(`  ${tx.type}: ${tx.amount} - ${tx.status}`);
+        });
+      }
+    }, 60000); // Every minute
+  }
+  
+  async generateReport() {
+    const transactions = await this.agent.getTransactions({
+      limit: 100,
+      since: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
+    });
+    
+    const report = {
+      agentId: this.agentId,
+      period: "24h",
+      totalTransactions: transactions.length,
+      successfulTransactions: transactions.filter(tx => tx.status === 'completed').length,
+      failedTransactions: transactions.filter(tx => tx.status === 'failed').length,
+      totalVolume: transactions.reduce((sum, tx) => sum + parseFloat(tx.amount), 0),
+      averageAmount: transactions.length > 0 ? 
+        transactions.reduce((sum, tx) => sum + parseFloat(tx.amount), 0) / transactions.length : 0,
+      generatedAt: new Date().toISOString()
+    };
+    
+    console.log('📊 Agent Activity Report:');
+    console.log(JSON.stringify(report, null, 2));
+    
+    return report;
+  }
+}
+```
+
+### Error Tracking
+
+Track and categorize errors during development:
+
+```javascript
+class ErrorTracker {
+  constructor() {
+    this.errors = [];
+  }
+  
+  trackError(error, context) {
+    const errorEntry = {
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      code: error.code,
+      context,
+      stack: error.stack
+    };
+    
+    this.errors.push(errorEntry);
+    
+    // Categorize error
+    const category = this.categorizeError(error);
+    console.error(`[${category}] ${error.message}`);
+    
+    // Suggest fix
+    const suggestion = this.suggestFix(error);
+    if (suggestion) {
+      console.log(`💡 Suggestion: ${suggestion}`);
+    }
+  }
+  
+  categorizeError(error) {
+    if (error.code === 'INSUFFICIENT_FUNDS') return 'FUNDING';
+    if (error.code === 'NETWORK_ERROR') return 'NETWORK';
+    if (error.code === 'POLICY_VIOLATION') return 'POLICY';
+    if (error.code === 'INVALID_SIGNATURE') return 'AUTH';
+    return 'UNKNOWN';
+  }
+  
+  suggestFix(error) {
+    switch (error.code) {
+      case 'INSUFFICIENT_FUNDS':
+        return 'Request funds from the testnet faucet: https://faucet.quicknode.com/base/sepolia';
+      case 'NETWORK_ERROR':
+        return 'Check your internet connection and RPC endpoint configuration';
+      case 'POLICY_VIOLATION':
+        return 'Review your agent policies and spending limits';
+      case 'INVALID_SIGNATURE':
+        return 'Verify your API key and agent configuration';
+      default:
+        return null;
+    }
+  }
+  
+  generateErrorReport() {
+    const summary = this.errors.reduce((acc, error) => {
+      const category = this.categorizeError(error);
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {});
+    
+    console.log('🚨 Error Summary:');
+    console.log(JSON.stringify(summary, null, 2));
+    
+    return {
+      totalErrors: this.errors.length,
+      errorsByCategory: summary,
+      recentErrors: this.errors.slice(-10)
+    };
+  }
+}
+```
+
+## Best Practices
+
+### Development Workflow
+
+Recommended workflow for testnet development:
+
+1. **Setup Phase**
+   ```bash
+   # Install dependencies
+   npm install @paystabl/sdk
+   
+   # Set up environment
+   cp .env.example .env.development
+   # Edit .env.development with testnet settings
+   
+   # Fund test agents
+   npm run fund:agent
+   ```
+
+2. **Development Phase**
+   ```bash
+   # Start development with hot reload
+   npm run dev:testnet
+   
+   # Run continuous tests
+   npm run test:watch
+   
+   # Monitor agent activity
+   npm run monitor:agent
+   ```
+
+3. **Testing Phase**
+   ```bash
+   # Run full test suite
+   npm run test:integration
+   
+   # Test specific scenarios
+   npm run test:api-payments
+   npm run test:agent-payments
+   npm run test:error-handling
+   ```
+
+4. **Debugging Phase**
+   ```bash
+   # Enable debug mode
+   export PAYSTABL_DEBUG=true
+   
+   # Check logs
+   npm run logs:agent
+   
+   # Generate reports
+   npm run report:errors
+   npm run report:activity
+   ```
+
+### Resource Management
+
+Manage testnet resources efficiently:
+
+```javascript
+class ResourceManager {
+  constructor() {
+    this.agents = new Map();
+    this.cleanupInterval = null;
+  }
+  
+  async createTestAgent(agentId, config = {}) {
+    const agent = new PayStablAgent({
+      agentId,
+      network: "base-sepolia",
+      ...config
+    });
+    
+    // Ensure funding
+    await this.ensureFunding(agent);
+    
+    // Set reasonable policies for testing
+    await agent.configurePolicies({
+      dailyLimit: "1.0",        // 1 ETH daily limit
+      perCallLimit: "0.1",      // 0.1 ETH per transaction
+      allowedDomains: [
+        "test-402-api.paystabl.com",
+        "localhost:3000",
+        "staging-api.example.com"
+      ]
+    });
+    
+    this.agents.set(agentId, agent);
+    return agent;
+  }
+  
+  async ensureFunding(agent, minimumBalance = "0.1") {
+    const balance = await agent.getBalance();
+    
+    if (parseFloat(balance.eth) < parseFloat(minimumBalance)) {
+      console.log(`Requesting funds for agent...`);
+      const wallet = await agent.getWallet();
+      await this.requestFaucetFunds(wallet.address);
+    }
+  }
+  
+  async cleanup() {
+    console.log('Cleaning up test resources...');
+    
+    // Check balances and return unused funds if possible
+    for (const [agentId, agent] of this.agents) {
+      const balance = await agent.getBalance();
+      
+      if (parseFloat(balance.eth) > 0.5) {
+        console.log(`Agent ${agentId} has ${balance.eth} ETH remaining`);
+        // Could implement fund return logic here
+      }
+    }
+    
+    this.agents.clear();
+  }
+  
+  startPeriodicCleanup() {
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredSessions();
+    }, 5 * 60 * 1000); // Every 5 minutes
+  }
+  
+  stopPeriodicCleanup() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+  }
+}
+```
+
+### Performance Testing
+
+Test performance characteristics on testnet:
+
+```javascript
+class PerformanceTester {
+  constructor(agentId) {
+    this.agent = new PayStablAgent({
+      agentId,
+      network: "base-sepolia"
+    });
+  }
+  
+  async testTransactionThroughput() {
+    console.log('Testing transaction throughput...');
+    
+    const startTime = Date.now();
+    const batchSize = 10;
+    const batches = 5;
+    
+    for (let batch = 0; batch < batches; batch++) {
+      const batchStart = Date.now();
+      
+      const promises = Array.from({ length: batchSize }, (_, i) =>
+        this.agent.pay_agent({
+          fromAgentId: this.agent.agentId,
+          toAgentId: "test_recipient_agent",
+          amount: "0.001",
+          purpose: `Throughput test batch ${batch} tx ${i}`
+        })
+      );
+      
+      await Promise.all(promises);
+      
+      const batchTime = Date.now() - batchStart;
+      console.log(`Batch ${batch + 1}: ${batchSize} transactions in ${batchTime}ms`);
+    }
+    
+    const totalTime = Date.now() - startTime;
+    const totalTransactions = batchSize * batches;
+    const tps = totalTransactions / (totalTime / 1000);
+    
+    console.log(`\n📊 Performance Results:`);
+    console.log(`Total transactions: ${totalTransactions}`);
+    console.log(`Total time: ${totalTime}ms`);
+    console.log(`Transactions per second: ${tps.toFixed(2)}`);
+    
+    return { totalTransactions, totalTime, tps };
+  }
+  
+  async testAPIPaymentLatency() {
+    console.log('Testing API payment latency...');
+    
+    const iterations = 20;
+    const latencies = [];
+    
+    for (let i = 0; i < iterations; i++) {
+      const start = Date.now();
+      
+      try {
+        await this.agent.pay_api_endpoint({
+          url: "https://test-402-api.paystabl.com/latency-test",
+          method: "GET"
+        });
+        
+        const latency = Date.now() - start;
+        latencies.push(latency);
+        console.log(`Request ${i + 1}: ${latency}ms`);
+        
+      } catch (error) {
+        console.error(`Request ${i + 1} failed:`, error.message);
+      }
+      
+      // Small delay between requests
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    const avgLatency = latencies.reduce((sum, l) => sum + l, 0) / latencies.length;
+    const minLatency = Math.min(...latencies);
+    const maxLatency = Math.max(...latencies);
+    
+    console.log(`\n📊 Latency Results:`);
+    console.log(`Average: ${avgLatency.toFixed(2)}ms`);
+    console.log(`Min: ${minLatency}ms`);
+    console.log(`Max: ${maxLatency}ms`);
+    
+    return { average: avgLatency, min: minLatency, max: maxLatency };
+  }
+}
+```
+
+## Transition to Production
+
+### Pre-production Checklist
+
+Before moving to mainnet:
+
+- [ ] All tests pass on testnet
+- [ ] Performance requirements met
+- [ ] Security policies configured
+- [ ] Error handling tested
+- [ ] Monitoring and alerting set up
+- [ ] Backup and recovery procedures tested
+- [ ] Documentation updated
+- [ ] Team training completed
+
+### Configuration Changes
+
+Update configuration for production:
+
+```javascript
+// Change network configuration
+const agent = new PayStablAgent({
+  agentId: "production_agent",
+  network: "base-mainnet",  // Switch to mainnet
+  apiKey: process.env.PAYSTABL_PROD_API_KEY
+});
+
+// Update policies for production
+await agent.configurePolicies({
+  dailyLimit: "100.00",      // Higher limits for production
+  perCallLimit: "10.00",
+  allowedDomains: [
+    "api.production-service.com",
+    "trusted-partner.io"
+  ],
+  requireApproval: {
+    threshold: "50.00"        // Require approval for large amounts
+  }
+});
+```
+
+## Related Documentation
+
+- [Quickstart Guide](/docs/quickstart) - Basic setup instructions
+- [Security Guide](/docs/security) - Security best practices
+- [Integration Guides](/docs/integrations/mcp) - Framework integrations
+- [Architecture](/docs/architecture) - System architecture overview
+
+## Support
+
+- [Discord #testnet Channel](https://discord.gg/paystabl)
+- [GitHub Issues](https://github.com/paystabl/sdk/issues)
+- [Email Support](mailto:support@paystabl.com)
+- [Testnet Status](https://status.paystabl.com/testnet)

@@ -1,0 +1,29 @@
+{
+  "id": "quickstart",
+  "title": "Quick Start",
+  "description": "Get started with PayStabl in minutes",
+  "source": "@site/docs/quickstart.mdx",
+  "sourceDirName": ".",
+  "slug": "/quickstart",
+  "permalink": "/quickstart",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/quickstart.mdx",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "sidebar_position": 2,
+    "title": "Quick Start",
+    "description": "Get started with PayStabl in minutes"
+  },
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Introduction",
+    "permalink": "/introduction"
+  },
+  "next": {
+    "title": "System Architecture",
+    "permalink": "/architecture"
+  }
+}

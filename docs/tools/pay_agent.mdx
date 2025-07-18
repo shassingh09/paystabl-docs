@@ -1,0 +1,528 @@
+# 🤝 Tool: `pay_agent`
+
+Use this tool to send payments between agents within the PayStabl ecosystem. This is ideal for agent-to-agent plugin usage, compute, data sharing, or tool access.
+
+---
+
+## 🤖 Use Case
+
+Agent A wants to compensate Agent B for services like:
+- Text summarization
+- Tokenization
+- JSON conversion
+- Result lookup
+
+---
+
+## ✅ Input
+
+```json
+{
+  "fromAgentId": "agent_abc",
+  "toAgentId": "agent_xyz",
+  "amount": "0.25",
+  "purpose": "Used tokenizer agent for Claude"
+}
+```
+
+## 📤 Output
+
+```json
+{
+  "status": "success",
+  "txHash": "0x...",
+  "xPayStablReceipt": "..."
+}
+```
+
+## 🧪 Example Usage (JS)
+
+```javascript
+await pay_agent({
+  fromAgentId: "agent_abc",
+  toAgentId: "agent_xyz",
+  amount: "0.25",
+  purpose: "Claude used your parser tool"
+});
+```
+
+## 🛡️ Notes
+
+- Both agents must be registered in PayStabl.
+- Payment logs are stored onchain or optionally via PayStabl's backend.
+
+---
+
+## Detailed API Reference
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `fromAgentId` | string | Yes | ID of the paying agent |
+| `toAgentId` | string | Yes | ID of the receiving agent |
+| `amount` | string | Yes | Payment amount in USD (e.g., "0.25") |
+| `purpose` | string | No | Description of the payment purpose |
+| `metadata` | object | No | Additional payment metadata |
+| `timeout` | number | No | Transaction timeout in seconds (default: 60) |
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | Payment status ("success", "pending", "failed") |
+| `txHash` | string | Blockchain transaction hash |
+| `xPayStablReceipt` | string | PayStabl receipt identifier |
+| `timestamp` | string | Transaction timestamp (ISO 8601) |
+| `fees` | object | Transaction fee breakdown |
+
+## Advanced Usage
+
+### Agent Service Marketplace
+
+Create a marketplace where agents can offer and pay for services:
+
+```javascript
+// Agent registry service
+class AgentMarketplace {
+  constructor() {
+    this.services = new Map();
+    this.agents = new Map();
+  }
+
+  // Register an agent service
+  registerService(agentId, service) {
+    this.services.set(service.id, {
+      agentId,
+      name: service.name,
+      description: service.description,
+      price: service.price,
+      endpoint: service.endpoint
+    });
+  }
+
+  // Pay for and use a service
+  async useService(fromAgentId, serviceId, params) {
+    const service = this.services.get(serviceId);
+    if (!service) throw new Error("Service not found");
+
+    // Pay the service provider
+    const payment = await pay_agent({
+      fromAgentId,
+      toAgentId: service.agentId,
+      amount: service.price,
+      purpose: `Used service: ${service.name}`
+    });
+
+    // Call the service
+    const result = await fetch(service.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-PayStabl-Receipt': payment.xPayStablReceipt
+      },
+      body: JSON.stringify(params)
+    });
+
+    return {
+      payment,
+      result: await result.json()
+    };
+  }
+}
+
+// Usage example
+const marketplace = new AgentMarketplace();
+
+// Agent B registers a summarization service
+marketplace.registerService("agent_b", {
+  id: "summarize",
+  name: "Text Summarization",
+  description: "Summarize long texts to key points",
+  price: "0.10",
+  endpoint: "https://agent-b.com/api/summarize"
+});
+
+// Agent A uses Agent B's service
+const result = await marketplace.useService("agent_a", "summarize", {
+  text: "Long document content..."
+});
+```
+
+### Bulk Payments
+
+For scenarios where an agent needs to pay multiple agents:
+
+```javascript
+// Pay multiple agents for a collaborative task
+async function payCollaborators(projectId, collaborators) {
+  const payments = await Promise.all(
+    collaborators.map(({ agentId, amount, role }) =>
+      pay_agent({
+        fromAgentId: "project_coordinator",
+        toAgentId: agentId,
+        amount,
+        purpose: `Payment for ${role} on project ${projectId}`,
+        metadata: { projectId, role }
+      })
+    )
+  );
+
+  return {
+    projectId,
+    totalPaid: collaborators.reduce((sum, c) => sum + parseFloat(c.amount), 0),
+    payments
+  };
+}
+
+// Example usage
+await payCollaborators("research_project_001", [
+  { agentId: "researcher_agent", amount: "5.00", role: "research" },
+  { agentId: "writer_agent", amount: "3.00", role: "writing" },
+  { agentId: "editor_agent", amount: "2.00", role: "editing" }
+]);
+```
+
+### Subscription-Style Payments
+
+Set up recurring payments between agents:
+
+```javascript
+class AgentSubscription {
+  constructor(fromAgentId, toAgentId, amount, interval) {
+    this.fromAgentId = fromAgentId;
+    this.toAgentId = toAgentId;
+    this.amount = amount;
+    this.interval = interval; // in milliseconds
+    this.isActive = false;
+  }
+
+  start() {
+    this.isActive = true;
+    this.makePayment(); // Initial payment
+    this.scheduleNext();
+  }
+
+  stop() {
+    this.isActive = false;
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+    }
+  }
+
+  async makePayment() {
+    if (!this.isActive) return;
+
+    try {
+      const payment = await pay_agent({
+        fromAgentId: this.fromAgentId,
+        toAgentId: this.toAgentId,
+        amount: this.amount,
+        purpose: "Subscription payment"
+      });
+
+      console.log(`Subscription payment sent: ${payment.txHash}`);
+      this.scheduleNext();
+
+    } catch (error) {
+      console.error("Subscription payment failed:", error);
+      // Could implement retry logic or alerting here
+    }
+  }
+
+  scheduleNext() {
+    if (this.isActive) {
+      this.timeout = setTimeout(() => this.makePayment(), this.interval);
+    }
+  }
+}
+
+// Usage: Monthly subscription
+const subscription = new AgentSubscription(
+  "subscriber_agent",
+  "service_provider_agent", 
+  "10.00",
+  30 * 24 * 60 * 60 * 1000 // 30 days
+);
+
+subscription.start();
+```
+
+## Error Handling
+
+### Common Error Scenarios
+
+```javascript
+async function robustPayAgent(fromAgentId, toAgentId, amount, purpose) {
+  try {
+    const payment = await pay_agent({
+      fromAgentId,
+      toAgentId,
+      amount,
+      purpose
+    });
+
+    return payment;
+
+  } catch (error) {
+    switch (error.code) {
+      case 'INSUFFICIENT_FUNDS':
+        throw new Error(`Agent ${fromAgentId} has insufficient funds for payment of $${amount}`);
+        
+      case 'AGENT_NOT_FOUND':
+        throw new Error(`Recipient agent ${toAgentId} not found in PayStabl network`);
+        
+      case 'POLICY_VIOLATION':
+        throw new Error(`Payment blocked by agent policy: ${error.details}`);
+        
+      case 'NETWORK_ERROR':
+        // Retry with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return robustPayAgent(fromAgentId, toAgentId, amount, purpose);
+        
+      default:
+        throw new Error(`Payment failed: ${error.message}`);
+    }
+  }
+}
+```
+
+### Payment Verification
+
+Verify payments were received successfully:
+
+```javascript
+async function verifyPayment(txHash, expectedAmount, expectedRecipient) {
+  const transaction = await getTransactionDetails(txHash);
+  
+  if (!transaction) {
+    throw new Error("Transaction not found");
+  }
+  
+  if (transaction.status !== 'completed') {
+    throw new Error(`Transaction status: ${transaction.status}`);
+  }
+  
+  if (transaction.amount !== expectedAmount) {
+    throw new Error(`Amount mismatch: expected ${expectedAmount}, got ${transaction.amount}`);
+  }
+  
+  if (transaction.to !== expectedRecipient) {
+    throw new Error(`Recipient mismatch: expected ${expectedRecipient}, got ${transaction.to}`);
+  }
+  
+  return true;
+}
+```
+
+## Integration Examples
+
+### CrewAI Integration
+
+```python
+from crewai import Agent, Task, Crew
+from paystabl import PayStablAgent
+
+class PaymentEnabledCrew:
+    def __init__(self, crew_id):
+        self.crew_id = crew_id
+        self.paystabl_agent = PayStablAgent(agent_id=crew_id)
+        
+    def create_paid_task(self, description, agent_id, payment_amount):
+        def task_callback(task_output):
+            # Pay the agent for completing the task
+            self.paystabl_agent.pay_agent(
+                from_agent_id=self.crew_id,
+                to_agent_id=agent_id,
+                amount=payment_amount,
+                purpose=f"Task completion: {description[:50]}..."
+            )
+            return task_output
+            
+        return Task(
+            description=description,
+            callback=task_callback
+        )
+
+# Usage
+crew = PaymentEnabledCrew("research_crew")
+
+research_task = crew.create_paid_task(
+    "Research AI agent payment systems", 
+    "research_agent_001",
+    "2.50"
+)
+```
+
+### LangGraph Workflow
+
+```python
+from langgraph import StateGraph
+from paystabl import PayStablAgent
+
+def create_payment_workflow():
+    paystabl = PayStablAgent(agent_id="workflow_coordinator")
+    
+    def delegate_task(state):
+        # Delegate task to specialist agent
+        specialist_id = state["specialist_agent"]
+        task_description = state["task"]
+        
+        # Pay the specialist
+        payment = paystabl.pay_agent(
+            from_agent_id="workflow_coordinator",
+            to_agent_id=specialist_id,
+            amount="1.00",
+            purpose=f"Task delegation: {task_description}"
+        )
+        
+        # Add payment info to state
+        state["payment_receipt"] = payment["xPayStablReceipt"]
+        return state
+    
+    workflow = StateGraph()
+    workflow.add_node("delegate", delegate_task)
+    
+    return workflow
+```
+
+## Best Practices
+
+### Agent Economics
+
+Design fair pricing models for agent services:
+
+```javascript
+// Dynamic pricing based on complexity
+function calculateServicePrice(task) {
+  const basePrice = 0.10;
+  const complexityMultiplier = {
+    'simple': 1.0,
+    'medium': 2.0,
+    'complex': 5.0
+  };
+  
+  const urgencyMultiplier = task.urgent ? 1.5 : 1.0;
+  
+  return (basePrice * complexityMultiplier[task.complexity] * urgencyMultiplier).toFixed(2);
+}
+
+// Quality-based payments
+async function payBasedOnQuality(agentId, baseAmount, qualityScore) {
+  const qualityMultiplier = Math.max(0.5, Math.min(2.0, qualityScore));
+  const finalAmount = (parseFloat(baseAmount) * qualityMultiplier).toFixed(2);
+  
+  return await pay_agent({
+    fromAgentId: "quality_assessor",
+    toAgentId: agentId,
+    amount: finalAmount,
+    purpose: `Quality-adjusted payment (score: ${qualityScore})`
+  });
+}
+```
+
+### Reputation System
+
+Track agent performance for future payment decisions:
+
+```javascript
+class AgentReputationSystem {
+  constructor() {
+    this.reputation = new Map();
+  }
+  
+  recordTransaction(agentId, amount, quality, timeliness) {
+    if (!this.reputation.has(agentId)) {
+      this.reputation.set(agentId, {
+        totalEarned: 0,
+        totalTransactions: 0,
+        averageQuality: 0,
+        averageTimeliness: 0
+      });
+    }
+    
+    const rep = this.reputation.get(agentId);
+    rep.totalEarned += parseFloat(amount);
+    rep.totalTransactions += 1;
+    rep.averageQuality = (rep.averageQuality * (rep.totalTransactions - 1) + quality) / rep.totalTransactions;
+    rep.averageTimeliness = (rep.averageTimeliness * (rep.totalTransactions - 1) + timeliness) / rep.totalTransactions;
+  }
+  
+  getReputationScore(agentId) {
+    const rep = this.reputation.get(agentId);
+    if (!rep) return 0;
+    
+    return (rep.averageQuality * 0.6 + rep.averageTimeliness * 0.4);
+  }
+}
+```
+
+## Security Considerations
+
+### Payment Limits and Policies
+
+Set appropriate limits for agent-to-agent payments:
+
+```javascript
+await agent.configurePolicies({
+  agentPayments: {
+    dailyLimit: "100.00",
+    perTransactionLimit: "10.00",
+    trustedAgents: [
+      "verified_agent_001",
+      "certified_service_provider"
+    ],
+    requireApprovalAbove: "25.00"
+  }
+});
+```
+
+### Audit Trail
+
+Maintain comprehensive payment logs:
+
+```javascript
+async function auditAgentPayments(agentId, timeframe) {
+  const payments = await getAgentTransactions(agentId, timeframe);
+  
+  const summary = {
+    totalSent: 0,
+    totalReceived: 0,
+    uniqueCounterparts: new Set(),
+    averageTransactionSize: 0,
+    paymentPurposes: {}
+  };
+  
+  payments.forEach(payment => {
+    if (payment.fromAgentId === agentId) {
+      summary.totalSent += parseFloat(payment.amount);
+      summary.uniqueCounterparts.add(payment.toAgentId);
+    } else {
+      summary.totalReceived += parseFloat(payment.amount);
+      summary.uniqueCounterparts.add(payment.fromAgentId);
+    }
+    
+    const purpose = payment.purpose || 'unspecified';
+    summary.paymentPurposes[purpose] = (summary.paymentPurposes[purpose] || 0) + 1;
+  });
+  
+  summary.averageTransactionSize = (summary.totalSent + summary.totalReceived) / payments.length;
+  summary.uniqueCounterparts = summary.uniqueCounterparts.size;
+  
+  return summary;
+}
+```
+
+## Related Tools
+
+- [`pay_api_endpoint`](/docs/tools/pay_api_endpoint) - Pay external APIs
+- [Security Guide](/docs/security) - Agent wallet security
+- [Examples](/docs/examples/agent_to_agent) - Real-world implementations
+
+## Support
+
+Need help with agent-to-agent payments? 
+
+- [Discord Community](https://discord.gg/paystabl)
+- [GitHub Issues](https://github.com/paystabl/sdk/issues) 
+- [Email Support](mailto:support@paystabl.com)

@@ -1,0 +1,934 @@
+# Agent-to-Agent Payment Examples
+
+This guide demonstrates how AI agents can autonomously pay each other for services, creating collaborative workflows and marketplace dynamics. Examples show real-world scenarios where agents exchange value.
+
+## Basic Agent Payment
+
+### Simple Payment Between Agents
+
+```typescript
+import { PayStablAgent } from '@paystabl/sdk';
+
+// Coordinator agent that needs data analysis
+const coordinatorAgent = new PayStablAgent({
+  agentId: "data_coordinator",
+  network: "base-sepolia"
+});
+
+// Specialist agent that provides analysis services  
+const analysisAgent = new PayStablAgent({
+  agentId: "analysis_specialist",
+  network: "base-sepolia"
+});
+
+async function basicAgentPayment() {
+  // Coordinator pays analyst for service
+  const payment = await coordinatorAgent.pay_agent({
+    fromAgentId: "data_coordinator",
+    toAgentId: "analysis_specialist", 
+    amount: "5.00",
+    purpose: "Customer sentiment analysis for Q4 data"
+  });
+
+  console.log("Payment sent:", payment.txHash);
+  console.log("Receipt:", payment.xPayStablReceipt);
+  
+  return payment;
+}
+```
+
+### Payment with Service Request
+
+```typescript
+async function paymentWithServiceRequest() {
+  const serviceRequest = {
+    type: "sentiment_analysis",
+    data: {
+      text_samples: 1000,
+      languages: ["en", "es", "fr"],
+      urgency: "high"
+    },
+    deadline: "2024-01-20T15:00:00Z"
+  };
+
+  // Calculate dynamic pricing based on request complexity
+  const baseCost = 3.00;
+  const complexityMultiplier = serviceRequest.data.languages.length * 0.5;
+  const urgencyMultiplier = serviceRequest.urgency === "high" ? 1.5 : 1.0;
+  const finalAmount = (baseCost * complexityMultiplier * urgencyMultiplier).toFixed(2);
+
+  const payment = await coordinatorAgent.pay_agent({
+    fromAgentId: "data_coordinator",
+    toAgentId: "analysis_specialist",
+    amount: finalAmount,
+    purpose: `Sentiment analysis: ${serviceRequest.type}`,
+    metadata: {
+      service_request: serviceRequest,
+      pricing_breakdown: {
+        base_cost: baseCost,
+        complexity_multiplier: complexityMultiplier,
+        urgency_multiplier: urgencyMultiplier
+      }
+    }
+  });
+
+  return { payment, serviceRequest, amount: finalAmount };
+}
+```
+
+## Advanced Collaboration Patterns
+
+### Multi-Agent Research Pipeline
+
+```typescript
+class ResearchPipeline {
+  constructor() {
+    this.orchestrator = new PayStablAgent({
+      agentId: "research_orchestrator",
+      network: "base-sepolia"
+    });
+    
+    this.agents = {
+      data_collector: "data_collection_agent",
+      analyst: "statistical_analyst_agent", 
+      writer: "technical_writer_agent",
+      reviewer: "peer_reviewer_agent"
+    };
+  }
+
+  async executeResearchProject(topic: string, budget: number) {
+    const project = {
+      id: `research_${Date.now()}`,
+      topic,
+      budget,
+      phases: [],
+      totalCost: 0
+    };
+
+    try {
+      // Phase 1: Data Collection
+      const dataPhase = await this.executePhase({
+        agent: this.agents.data_collector,
+        task: "data_collection",
+        description: `Collect research data on: ${topic}`,
+        amount: "8.00",
+        project
+      });
+      
+      // Phase 2: Statistical Analysis
+      const analysisPhase = await this.executePhase({
+        agent: this.agents.analyst,
+        task: "statistical_analysis", 
+        description: `Analyze collected data for ${topic}`,
+        amount: "12.00",
+        dependencies: [dataPhase.payment.txHash],
+        project
+      });
+
+      // Phase 3: Technical Writing
+      const writingPhase = await this.executePhase({
+        agent: this.agents.writer,
+        task: "technical_writing",
+        description: `Write research report on ${topic}`,
+        amount: "10.00", 
+        dependencies: [analysisPhase.payment.txHash],
+        project
+      });
+
+      // Phase 4: Peer Review
+      const reviewPhase = await this.executePhase({
+        agent: this.agents.reviewer,
+        task: "peer_review",
+        description: `Review and validate research report`,
+        amount: "6.00",
+        dependencies: [writingPhase.payment.txHash],
+        project
+      });
+
+      return {
+        success: true,
+        project,
+        totalCost: project.totalCost,
+        phases: project.phases
+      };
+
+    } catch (error) {
+      console.error("Research pipeline failed:", error);
+      return {
+        success: false,
+        error: error.message,
+        project,
+        partialCost: project.totalCost
+      };
+    }
+  }
+
+  async executePhase({ agent, task, description, amount, dependencies = [], project }) {
+    console.log(`\n🚀 Starting phase: ${task}`);
+    console.log(`💰 Cost: $${amount}`);
+    
+    // Wait for dependencies if any
+    if (dependencies.length > 0) {
+      console.log(`⏳ Waiting for dependencies: ${dependencies.length} transactions`);
+      await this.waitForTransactions(dependencies);
+    }
+
+    // Check budget constraint
+    if (project.totalCost + parseFloat(amount) > project.budget) {
+      throw new Error(`Budget exceeded: ${project.totalCost + parseFloat(amount)} > ${project.budget}`);
+    }
+
+    // Execute payment
+    const payment = await this.orchestrator.pay_agent({
+      fromAgentId: "research_orchestrator",
+      toAgentId: agent,
+      amount,
+      purpose: description,
+      metadata: {
+        project_id: project.id,
+        phase: task,
+        dependencies
+      }
+    });
+
+    project.totalCost += parseFloat(amount);
+    
+    const phaseResult = {
+      task,
+      agent,
+      amount: parseFloat(amount),
+      payment,
+      timestamp: new Date().toISOString(),
+      status: "completed"
+    };
+
+    project.phases.push(phaseResult);
+
+    console.log(`✅ Phase completed: ${task}`);
+    console.log(`📄 Transaction: ${payment.txHash}`);
+    
+    return phaseResult;
+  }
+
+  async waitForTransactions(txHashes: string[]) {
+    // Simulate waiting for transaction confirmations
+    for (const txHash of txHashes) {
+      console.log(`⏳ Confirming transaction: ${txHash.substring(0, 10)}...`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+}
+
+// Usage
+async function runResearchPipeline() {
+  const pipeline = new ResearchPipeline();
+  
+  const result = await pipeline.executeResearchProject(
+    "AI Agent Payment Systems Market Analysis",
+    50.00 // $50 budget
+  );
+
+  if (result.success) {
+    console.log("\n🎉 Research pipeline completed successfully!");
+    console.log(`📊 Total cost: $${result.totalCost}`);
+    console.log(`📋 Phases completed: ${result.phases.length}`);
+  } else {
+    console.log("\n❌ Research pipeline failed");
+    console.log(`💸 Partial cost: $${result.partialCost}`);
+  }
+}
+```
+
+### Quality-Based Payment System
+
+```typescript
+class QualityBasedPaymentSystem {
+  constructor() {
+    this.paymaster = new PayStablAgent({
+      agentId: "quality_paymaster",
+      network: "base-sepolia"
+    });
+  }
+
+  async payForService(
+    provider: string,
+    service: string,
+    baseAmount: string,
+    qualityMetrics: QualityMetrics
+  ) {
+    // Calculate quality bonus/penalty
+    const qualityScore = this.calculateQualityScore(qualityMetrics);
+    const adjustment = this.calculatePaymentAdjustment(qualityScore);
+    
+    const basePayment = parseFloat(baseAmount);
+    const finalAmount = (basePayment * adjustment).toFixed(2);
+    
+    const paymentPurpose = this.generatePaymentPurpose(
+      service, 
+      qualityScore, 
+      adjustment,
+      qualityMetrics
+    );
+
+    const payment = await this.paymaster.pay_agent({
+      fromAgentId: "quality_paymaster",
+      toAgentId: provider,
+      amount: finalAmount,
+      purpose: paymentPurpose,
+      metadata: {
+        base_amount: baseAmount,
+        quality_score: qualityScore,
+        adjustment_factor: adjustment,
+        quality_metrics: qualityMetrics,
+        service_type: service
+      }
+    });
+
+    return {
+      payment,
+      qualityAssessment: {
+        score: qualityScore,
+        adjustment,
+        baseAmount: basePayment,
+        finalAmount: parseFloat(finalAmount),
+        metrics: qualityMetrics
+      }
+    };
+  }
+
+  calculateQualityScore(metrics: QualityMetrics): number {
+    const weights = {
+      accuracy: 0.4,
+      completeness: 0.3,
+      timeliness: 0.2,
+      presentation: 0.1
+    };
+
+    return Object.entries(weights).reduce((score, [metric, weight]) => {
+      return score + (metrics[metric] || 0) * weight;
+    }, 0);
+  }
+
+  calculatePaymentAdjustment(qualityScore: number): number {
+    // Quality score ranges from 0-1
+    if (qualityScore >= 0.95) return 1.3;  // 30% bonus for exceptional work
+    if (qualityScore >= 0.9) return 1.2;   // 20% bonus for excellent work
+    if (qualityScore >= 0.8) return 1.1;   // 10% bonus for good work
+    if (qualityScore >= 0.7) return 1.0;   // Full payment for acceptable work
+    if (qualityScore >= 0.6) return 0.9;   // 10% reduction for poor work
+    return 0.8;                             // 20% reduction for very poor work
+  }
+
+  generatePaymentPurpose(
+    service: string, 
+    score: number, 
+    adjustment: number,
+    metrics: QualityMetrics
+  ): string {
+    const qualityLevel = score >= 0.9 ? "Excellent" :
+                        score >= 0.8 ? "Good" :
+                        score >= 0.7 ? "Acceptable" : "Below Standard";
+    
+    const adjustmentText = adjustment > 1.0 ? 
+      `+${((adjustment - 1) * 100).toFixed(0)}% quality bonus` :
+      adjustment < 1.0 ? 
+      `-${((1 - adjustment) * 100).toFixed(0)}% quality penalty` :
+      "standard payment";
+
+    return `${service} delivery - ${qualityLevel} quality (${adjustmentText})`;
+  }
+}
+
+interface QualityMetrics {
+  accuracy: number;      // 0-1 scale
+  completeness: number;  // 0-1 scale
+  timeliness: number;    // 0-1 scale
+  presentation: number;  // 0-1 scale
+}
+
+// Example usage
+async function demonstrateQualityPayments() {
+  const paymentSystem = new QualityBasedPaymentSystem();
+
+  // High quality work
+  const excellentWork = await paymentSystem.payForService(
+    "expert_analyst_agent",
+    "Market Research Report",
+    "15.00",
+    {
+      accuracy: 0.98,
+      completeness: 0.95,
+      timeliness: 0.9,
+      presentation: 0.92
+    }
+  );
+
+  console.log("Excellent work payment:");
+  console.log(`Base: $15.00 → Final: $${excellentWork.qualityAssessment.finalAmount}`);
+  console.log(`Quality score: ${excellentWork.qualityAssessment.score.toFixed(2)}`);
+
+  // Poor quality work
+  const poorWork = await paymentSystem.payForService(
+    "basic_analyzer_agent", 
+    "Quick Analysis",
+    "8.00",
+    {
+      accuracy: 0.6,
+      completeness: 0.7,
+      timeliness: 0.5,
+      presentation: 0.4
+    }
+  );
+
+  console.log("\nPoor work payment:");
+  console.log(`Base: $8.00 → Final: $${poorWork.qualityAssessment.finalAmount}`);
+  console.log(`Quality score: ${poorWork.qualityAssessment.score.toFixed(2)}`);
+}
+```
+
+### Agent Marketplace System
+
+```typescript
+class AgentMarketplace {
+  constructor() {
+    this.marketplace = new PayStablAgent({
+      agentId: "marketplace_coordinator",
+      network: "base-sepolia"
+    });
+    
+    this.serviceRegistry = new Map();
+    this.activeContracts = new Map();
+  }
+
+  registerService(agentId: string, serviceDetails: ServiceListing) {
+    this.serviceRegistry.set(agentId, {
+      ...serviceDetails,
+      agentId,
+      registeredAt: new Date(),
+      rating: serviceDetails.rating || 0,
+      completedJobs: serviceDetails.completedJobs || 0
+    });
+  }
+
+  async findBestProvider(serviceType: string, requirements: ServiceRequirements) {
+    const providers = Array.from(this.serviceRegistry.values())
+      .filter(service => service.type === serviceType)
+      .filter(service => this.meetsRequirements(service, requirements))
+      .sort((a, b) => this.calculateProviderScore(b) - this.calculateProviderScore(a));
+
+    return providers[0] || null;
+  }
+
+  async createServiceContract(
+    clientId: string,
+    providerId: string, 
+    serviceDetails: ContractDetails
+  ): Promise<ServiceContract> {
+    const contract = {
+      id: `contract_${Date.now()}`,
+      clientId,
+      providerId,
+      serviceDetails,
+      status: "pending",
+      createdAt: new Date(),
+      milestones: serviceDetails.milestones || [],
+      totalAmount: serviceDetails.amount,
+      escrowAmount: 0
+    };
+
+    // Calculate escrow amount (typically 50% upfront)
+    const escrowAmount = (parseFloat(serviceDetails.amount) * 0.5).toFixed(2);
+    
+    // Create escrow payment
+    const escrowPayment = await this.marketplace.pay_agent({
+      fromAgentId: clientId,
+      toAgentId: "marketplace_coordinator", // Marketplace holds escrow
+      amount: escrowAmount,
+      purpose: `Escrow for contract ${contract.id}`,
+      metadata: {
+        contract_id: contract.id,
+        type: "escrow",
+        release_conditions: serviceDetails.milestones
+      }
+    });
+
+    contract.escrowAmount = parseFloat(escrowAmount);
+    contract.escrowTxHash = escrowPayment.txHash;
+    contract.status = "active";
+
+    this.activeContracts.set(contract.id, contract);
+
+    return contract;
+  }
+
+  async releaseMilestonePayment(
+    contractId: string,
+    milestoneIndex: number,
+    clientApproval: boolean
+  ) {
+    const contract = this.activeContracts.get(contractId);
+    if (!contract) throw new Error("Contract not found");
+
+    const milestone = contract.milestones[milestoneIndex];
+    if (!milestone) throw new Error("Milestone not found");
+
+    if (!clientApproval) {
+      throw new Error("Client approval required for milestone payment");
+    }
+
+    // Release milestone payment
+    const payment = await this.marketplace.pay_agent({
+      fromAgentId: "marketplace_coordinator",
+      toAgentId: contract.providerId,
+      amount: milestone.amount,
+      purpose: `Milestone ${milestoneIndex + 1} payment for contract ${contractId}`,
+      metadata: {
+        contract_id: contractId,
+        milestone_index: milestoneIndex,
+        type: "milestone_release"
+      }
+    });
+
+    // Update contract status
+    milestone.status = "completed";
+    milestone.releasedAt = new Date();
+    milestone.txHash = payment.txHash;
+
+    // Check if all milestones completed
+    const allCompleted = contract.milestones.every(m => m.status === "completed");
+    if (allCompleted) {
+      contract.status = "completed";
+      await this.updateProviderRating(contract);
+    }
+
+    return payment;
+  }
+
+  calculateProviderScore(provider: ServiceProvider): number {
+    const ratingWeight = 0.4;
+    const experienceWeight = 0.3;
+    const priceWeight = 0.2;
+    const availabilityWeight = 0.1;
+
+    const ratingScore = provider.rating / 5; // Normalize to 0-1
+    const experienceScore = Math.min(provider.completedJobs / 100, 1); // Cap at 100 jobs
+    const priceScore = 1 - (provider.pricePerHour / 50); // Assuming $50/hour max
+    const availabilityScore = provider.available ? 1 : 0;
+
+    return (
+      ratingScore * ratingWeight +
+      experienceScore * experienceWeight +
+      priceScore * priceWeight +
+      availabilityScore * availabilityWeight
+    );
+  }
+
+  meetsRequirements(service: ServiceProvider, requirements: ServiceRequirements): boolean {
+    if (requirements.minRating && service.rating < requirements.minRating) return false;
+    if (requirements.maxPricePerHour && service.pricePerHour > requirements.maxPricePerHour) return false;
+    if (requirements.requiredSkills) {
+      const hasAllSkills = requirements.requiredSkills.every(skill => 
+        service.skills.includes(skill)
+      );
+      if (!hasAllSkills) return false;
+    }
+    if (requirements.maxDeliveryTime && service.estimatedDeliveryDays > requirements.maxDeliveryTime) return false;
+
+    return true;
+  }
+
+  async updateProviderRating(contract: ServiceContract) {
+    const provider = this.serviceRegistry.get(contract.providerId);
+    if (!provider) return;
+
+    // Simple rating update (in real system, would be based on client feedback)
+    provider.completedJobs += 1;
+    
+    // Update rating based on contract performance
+    const contractRating = this.calculateContractRating(contract);
+    provider.rating = (provider.rating * (provider.completedJobs - 1) + contractRating) / provider.completedJobs;
+  }
+
+  calculateContractRating(contract: ServiceContract): number {
+    // Simple rating based on timely completion
+    const completedOnTime = contract.milestones.every(milestone => {
+      if (!milestone.releasedAt) return false;
+      return milestone.releasedAt <= milestone.dueDate;
+    });
+
+    return completedOnTime ? 5.0 : 3.5; // 5 stars for on-time, 3.5 for late
+  }
+}
+
+interface ServiceListing {
+  type: string;
+  name: string;
+  description: string;
+  pricePerHour: number;
+  skills: string[];
+  estimatedDeliveryDays: number;
+  available: boolean;
+  rating?: number;
+  completedJobs?: number;
+}
+
+interface ServiceRequirements {
+  minRating?: number;
+  maxPricePerHour?: number;
+  requiredSkills?: string[];
+  maxDeliveryTime?: number;
+}
+
+interface ContractDetails {
+  description: string;
+  amount: string;
+  milestones: Milestone[];
+  deadline: Date;
+}
+
+interface Milestone {
+  description: string;
+  amount: string;
+  dueDate: Date;
+  status: "pending" | "completed";
+  releasedAt?: Date;
+  txHash?: string;
+}
+
+interface ServiceContract {
+  id: string;
+  clientId: string;
+  providerId: string;
+  serviceDetails: ContractDetails;
+  status: "pending" | "active" | "completed" | "disputed";
+  createdAt: Date;
+  milestones: Milestone[];
+  totalAmount: string;
+  escrowAmount: number;
+  escrowTxHash?: string;
+}
+
+interface ServiceProvider {
+  agentId: string;
+  type: string;
+  name: string;
+  description: string;
+  pricePerHour: number;
+  skills: string[];
+  estimatedDeliveryDays: number;
+  available: boolean;
+  rating: number;
+  completedJobs: number;
+  registeredAt: Date;
+}
+
+// Example marketplace usage
+async function demonstrateMarketplace() {
+  const marketplace = new AgentMarketplace();
+
+  // Register service providers
+  marketplace.registerService("data_analyst_pro", {
+    type: "data_analysis",
+    name: "Professional Data Analyst",
+    description: "Expert statistical analysis and visualization",
+    pricePerHour: 25,
+    skills: ["statistical_analysis", "data_visualization", "python", "r"],
+    estimatedDeliveryDays: 3,
+    available: true,
+    rating: 4.8,
+    completedJobs: 45
+  });
+
+  marketplace.registerService("content_writer_ai", {
+    type: "content_creation",
+    name: "AI Content Specialist", 
+    description: "High-quality content creation and editing",
+    pricePerHour: 15,
+    skills: ["copywriting", "editing", "seo", "research"],
+    estimatedDeliveryDays: 2,
+    available: true,
+    rating: 4.6,
+    completedJobs: 32
+  });
+
+  // Find best provider for a job
+  const bestAnalyst = await marketplace.findBestProvider("data_analysis", {
+    minRating: 4.5,
+    maxPricePerHour: 30,
+    requiredSkills: ["statistical_analysis", "python"],
+    maxDeliveryTime: 5
+  });
+
+  console.log("Best analyst found:", bestAnalyst?.name);
+
+  if (bestAnalyst) {
+    // Create contract
+    const contract = await marketplace.createServiceContract(
+      "research_coordinator",
+      bestAnalyst.agentId,
+      {
+        description: "Market analysis for Q1 data",
+        amount: "75.00",
+        deadline: new Date("2024-02-01"),
+        milestones: [
+          {
+            description: "Data collection and cleaning",
+            amount: "25.00",
+            dueDate: new Date("2024-01-25"),
+            status: "pending"
+          },
+          {
+            description: "Statistical analysis", 
+            amount: "30.00",
+            dueDate: new Date("2024-01-28"),
+            status: "pending"
+          },
+          {
+            description: "Final report and visualization",
+            amount: "20.00",
+            dueDate: new Date("2024-02-01"),
+            status: "pending"
+          }
+        ]
+      }
+    );
+
+    console.log("Contract created:", contract.id);
+    console.log("Escrow amount:", contract.escrowAmount);
+
+    // Simulate milestone completion and payment
+    await marketplace.releaseMilestonePayment(contract.id, 0, true);
+    console.log("Milestone 1 payment released");
+  }
+}
+```
+
+## Agent Communication Protocols
+
+### Service Discovery Protocol
+
+```typescript
+class AgentDiscoveryProtocol {
+  constructor() {
+    this.registry = new Map();
+    this.heartbeat = new Map();
+  }
+
+  async announceService(agentId: string, capabilities: AgentCapabilities) {
+    const announcement = {
+      agentId,
+      capabilities,
+      timestamp: new Date(),
+      endpoint: capabilities.endpoint,
+      pricing: capabilities.pricing
+    };
+
+    this.registry.set(agentId, announcement);
+    this.startHeartbeat(agentId);
+
+    // Broadcast announcement to other agents
+    await this.broadcastServiceAnnouncement(announcement);
+  }
+
+  async discoverServices(requirements: ServiceRequirements): Promise<AgentCapabilities[]> {
+    const availableServices = Array.from(this.registry.values())
+      .filter(service => this.isAgentAlive(service.agentId))
+      .filter(service => this.matchesRequirements(service.capabilities, requirements))
+      .sort((a, b) => this.rankService(b.capabilities) - this.rankService(a.capabilities));
+
+    return availableServices.map(service => service.capabilities);
+  }
+
+  async requestService(
+    clientId: string, 
+    providerId: string, 
+    serviceRequest: ServiceRequest
+  ): Promise<ServiceResponse> {
+    const provider = this.registry.get(providerId);
+    if (!provider) {
+      throw new Error("Provider not found");
+    }
+
+    // Send service request
+    const request = {
+      id: `req_${Date.now()}`,
+      clientId,
+      providerId,
+      serviceRequest,
+      timestamp: new Date()
+    };
+
+    // Calculate estimated cost
+    const estimatedCost = this.calculateServiceCost(
+      provider.capabilities, 
+      serviceRequest
+    );
+
+    // Return service response with payment details
+    return {
+      requestId: request.id,
+      providerId,
+      estimatedCost,
+      estimatedDelivery: new Date(Date.now() + provider.capabilities.estimatedDeliveryMs),
+      paymentRequired: true,
+      paymentAddress: provider.capabilities.paymentAddress
+    };
+  }
+
+  private calculateServiceCost(
+    capabilities: AgentCapabilities, 
+    request: ServiceRequest
+  ): string {
+    const baseRate = capabilities.pricing.baseRate;
+    const complexity = request.complexity || 1;
+    const urgency = request.urgency === "high" ? 1.5 : 1.0;
+
+    return (baseRate * complexity * urgency).toFixed(2);
+  }
+
+  private rankService(capabilities: AgentCapabilities): number {
+    // Simple ranking based on price and quality
+    const priceScore = 100 / capabilities.pricing.baseRate; // Lower price = higher score
+    const qualityScore = capabilities.qualityRating * 20;
+    
+    return priceScore + qualityScore;
+  }
+
+  private isAgentAlive(agentId: string): boolean {
+    const lastHeartbeat = this.heartbeat.get(agentId);
+    if (!lastHeartbeat) return false;
+    
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    return lastHeartbeat > fiveMinutesAgo;
+  }
+
+  private startHeartbeat(agentId: string) {
+    const interval = setInterval(() => {
+      this.heartbeat.set(agentId, new Date());
+    }, 60000); // Every minute
+
+    // Clean up interval when agent disconnects
+    setTimeout(() => {
+      clearInterval(interval);
+      this.registry.delete(agentId);
+      this.heartbeat.delete(agentId);
+    }, 10 * 60 * 1000); // 10 minutes timeout
+  }
+}
+
+interface AgentCapabilities {
+  agentId: string;
+  name: string;
+  description: string;
+  serviceTypes: string[];
+  endpoint: string;
+  pricing: {
+    baseRate: number;
+    currency: string;
+    billingModel: "per_request" | "per_hour" | "per_result";
+  };
+  qualityRating: number;
+  estimatedDeliveryMs: number;
+  paymentAddress: string;
+}
+
+interface ServiceRequest {
+  type: string;
+  parameters: any;
+  complexity?: number;
+  urgency?: "low" | "normal" | "high";
+  deadline?: Date;
+}
+
+interface ServiceResponse {
+  requestId: string;
+  providerId: string;
+  estimatedCost: string;
+  estimatedDelivery: Date;
+  paymentRequired: boolean;
+  paymentAddress: string;
+}
+```
+
+## Best Practices
+
+### 1. **Payment Security**
+- Always verify agent identity before payments
+- Use escrow for larger transactions
+- Implement dispute resolution mechanisms
+- Monitor for suspicious payment patterns
+
+### 2. **Quality Assurance**
+- Implement quality-based payment adjustments
+- Use reputation systems for agent ranking
+- Require deliverable validation before full payment
+- Maintain service level agreements
+
+### 3. **Cost Optimization**
+- Use tiered pricing based on service complexity
+- Implement bulk payment discounts
+- Monitor and optimize payment gas costs
+- Track ROI for agent collaborations
+
+### 4. **Operational Excellence**
+- Implement comprehensive logging and monitoring
+- Use circuit breakers for failing agents
+- Maintain service discovery and health checks
+- Plan for agent failure and recovery scenarios
+
+## Integration Examples
+
+### With LangGraph
+```python
+from langgraph import StateGraph
+from paystabl import PayStablAgent
+
+def create_agent_collaboration_graph():
+    workflow = StateGraph(CollaborationState)
+    
+    workflow.add_node("find_specialist", find_specialist_agent)
+    workflow.add_node("negotiate_price", negotiate_service_price)
+    workflow.add_node("pay_agent", execute_agent_payment)
+    workflow.add_node("monitor_delivery", monitor_service_delivery)
+    
+    return workflow.compile()
+```
+
+### With n8n
+```json
+{
+  "nodes": [
+    {
+      "name": "Find Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "https://agent-registry.com/search",
+        "method": "POST"
+      }
+    },
+    {
+      "name": "Pay Agent",
+      "type": "n8n-nodes-paystabl.agent-payment",
+      "parameters": {
+        "fromAgentId": "{{ $json.clientAgent }}",
+        "toAgentId": "{{ $json.selectedAgent }}",
+        "amount": "{{ $json.agreedPrice }}"
+      }
+    }
+  ]
+}
+```
+
+## Related Documentation
+
+- [Payment Tools Reference](/docs/tools/pay_agent)
+- [Security Guidelines](/docs/security)
+- [Integration Frameworks](/docs/integrations/mcp)
+- [Architecture Overview](/docs/architecture)
+
+## Support
+
+- [Discord Community](https://discord.gg/paystabl)
+- [Agent Marketplace](https://marketplace.paystabl.com)
+- [GitHub Examples](https://github.com/paystabl/agent-examples)
+- [Email Support](mailto:support@paystabl.com)

@@ -1,0 +1,24 @@
+{
+  "id": "tools/pay_api_endpoint",
+  "title": "🛠️ Tool: pay_api_endpoint",
+  "description": "Use this tool to call external APIs that support the x402 protocol via a 402 Payment Required response. PayStabl handles the full payment flow, including generating the signed X-Payment header and retrying the request.",
+  "source": "@site/docs/tools/pay_api_endpoint.mdx",
+  "sourceDirName": "tools",
+  "slug": "/tools/pay_api_endpoint",
+  "permalink": "/tools/pay_api_endpoint",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/tools/pay_api_endpoint.mdx",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "🤝 Tool: pay_agent",
+    "permalink": "/tools/pay_agent"
+  },
+  "next": {
+    "title": "x402 Headers Reference",
+    "permalink": "/reference/x402_headers"
+  }
+}

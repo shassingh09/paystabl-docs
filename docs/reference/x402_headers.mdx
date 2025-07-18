@@ -1,0 +1,660 @@
+# x402 Headers Reference
+
+The x402 protocol defines a standard HTTP status code and header structure for payment-required API endpoints. This reference covers the complete specification, validation rules, and implementation details for x402-enabled services.
+
+## Overview
+
+The x402 protocol extends HTTP with a standardized way to request payments for API access. When a client requests a paid resource, the server responds with status `402 Payment Required` and includes payment details in headers.
+
+## HTTP 402 Response Structure
+
+### Status Code
+
+```http
+HTTP/1.1 402 Payment Required
+```
+
+The `402 Payment Required` status code indicates that payment is required to access the requested resource.
+
+### Required Headers
+
+#### `Accept-Payment`
+
+Specifies the accepted payment methods and details:
+
+```http
+Accept-Payment: bitcoin lightning=lnbc1..., ethereum address=0x123..., paystabl agent=required
+```
+
+**Format:**
+```
+Accept-Payment: <method1> <param1>=<value1> <param2>=<value2>, <method2> <param1>=<value1>
+```
+
+**Supported Payment Methods:**
+- `bitcoin` - Bitcoin payments with lightning network support
+- `ethereum` - Ethereum-based payments
+- `paystabl` - PayStabl agent payments (recommended)
+- `stripe` - Traditional card payments
+
+#### `Payment-Amount`
+
+Specifies the payment amount and currency:
+
+```http
+Payment-Amount: amount=2.50 currency=USD
+```
+
+**Format:**
+```
+Payment-Amount: amount=<decimal> currency=<ISO-4217-code>
+```
+
+**Examples:**
+```http
+Payment-Amount: amount=1.00 currency=USD
+Payment-Amount: amount=0.001 currency=BTC
+Payment-Amount: amount=5.50 currency=EUR
+```
+
+#### `Payment-Purpose`
+
+Describes what the payment is for:
+
+```http
+Payment-Purpose: Premium API access for data analysis
+```
+
+**Format:**
+```
+Payment-Purpose: <human-readable-description>
+```
+
+#### `Payment-Expires`
+
+Specifies when the payment offer expires:
+
+```http
+Payment-Expires: Mon, 15 Jan 2024 10:30:00 GMT
+```
+
+**Format:**
+```
+Payment-Expires: <HTTP-date>
+```
+
+### Optional Headers
+
+#### `Payment-Receipt-Required`
+
+Indicates if a payment receipt should be included in subsequent requests:
+
+```http
+Payment-Receipt-Required: true
+```
+
+#### `Payment-Callback`
+
+Webhook URL for payment notifications:
+
+```http
+Payment-Callback: https://api.example.com/payment-webhook
+```
+
+#### `Payment-Metadata`
+
+Additional metadata about the payment:
+
+```http
+Payment-Metadata: endpoint=/premium-data, rate-limit=100req/hour
+```
+
+## Complete x402 Response Example
+
+```http
+HTTP/1.1 402 Payment Required
+Content-Type: application/json
+Accept-Payment: paystabl agent=required, bitcoin lightning=lnbc1..., ethereum address=0x123...
+Payment-Amount: amount=2.50 currency=USD
+Payment-Purpose: Premium weather data access
+Payment-Expires: Mon, 15 Jan 2024 10:30:00 GMT
+Payment-Receipt-Required: true
+Payment-Callback: https://weather-api.com/webhook/payment
+Payment-Metadata: endpoint=/weather/premium, rate=hourly
+
+{
+  "error": "payment_required",
+  "message": "Payment of $2.50 required for premium weather data",
+  "payment": {
+    "amount": "2.50",
+    "currency": "USD",
+    "methods": [
+      {
+        "type": "paystabl",
+        "agent_required": true,
+        "processor": "paystabl.com"
+      },
+      {
+        "type": "bitcoin",
+        "lightning_invoice": "lnbc25000n1...",
+        "address": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+      },
+      {
+        "type": "ethereum", 
+        "address": "0x742dC8a3d5b5A7c8e4A6D8B9d2A8F3E7C6B5A4D3",
+        "chain_id": 8453
+      }
+    ],
+    "expires_at": "2024-01-15T10:30:00Z",
+    "payment_id": "pay_abc123def456"
+  }
+}
+```
+
+## Payment Request Headers
+
+### `X-Payment`
+
+The client includes this header in the retry request after payment:
+
+```http
+X-Payment: type=paystabl receipt=0x1234... signature=0xabcd...
+```
+
+**PayStabl Format:**
+```
+X-Payment: type=paystabl receipt=<tx-hash> signature=<payment-signature> agent=<agent-id>
+```
+
+**Bitcoin Format:**
+```
+X-Payment: type=bitcoin txid=<transaction-id> confirmation=<block-height>
+```
+
+**Ethereum Format:**
+```
+X-Payment: type=ethereum txhash=<transaction-hash> amount=<paid-amount>
+```
+
+### `X-Payment-Receipt`
+
+Optional receipt information for audit purposes:
+
+```http
+X-Payment-Receipt: {"amount":"2.50","currency":"USD","timestamp":"2024-01-15T10:25:00Z","agent":"agent_123"}
+```
+
+## Validation Rules
+
+### Server-Side Validation
+
+Services implementing x402 must validate payment headers:
+
+```typescript
+interface PaymentValidator {
+  validatePaymentHeader(header: string): Promise<ValidationResult>;
+  verifyPaymentAmount(payment: Payment, required: Amount): boolean;
+  checkPaymentExpiry(payment: Payment): boolean;
+  verifySignature(payment: Payment): Promise<boolean>;
+}
+
+class X402Validator implements PaymentValidator {
+  async validatePaymentHeader(header: string): Promise<ValidationResult> {
+    // Parse X-Payment header
+    const payment = this.parsePaymentHeader(header);
+    
+    // Validate format
+    if (!this.isValidFormat(payment)) {
+      return {
+        valid: false,
+        error: "Invalid payment header format",
+        code: "INVALID_FORMAT"
+      };
+    }
+    
+    // Verify payment on blockchain
+    const verified = await this.verifyPaymentOnChain(payment);
+    if (!verified) {
+      return {
+        valid: false,
+        error: "Payment not found or invalid",
+        code: "PAYMENT_NOT_FOUND"
+      };
+    }
+    
+    // Check amount matches
+    const amountValid = this.verifyPaymentAmount(payment, this.requiredAmount);
+    if (!amountValid) {
+      return {
+        valid: false,
+        error: "Payment amount insufficient",
+        code: "INSUFFICIENT_AMOUNT"
+      };
+    }
+    
+    return {
+      valid: true,
+      payment
+    };
+  }
+  
+  private parsePaymentHeader(header: string): Payment {
+    const params = new URLSearchParams(header.replace(/=/g, '&'));
+    
+    return {
+      type: params.get('type'),
+      receipt: params.get('receipt'),
+      signature: params.get('signature'),
+      agent: params.get('agent'),
+      amount: params.get('amount')
+    };
+  }
+  
+  async verifyPaymentOnChain(payment: Payment): Promise<boolean> {
+    switch (payment.type) {
+      case 'paystabl':
+        return await this.verifyPayStablPayment(payment);
+      case 'bitcoin':
+        return await this.verifyBitcoinPayment(payment);
+      case 'ethereum':
+        return await this.verifyEthereumPayment(payment);
+      default:
+        return false;
+    }
+  }
+}
+```
+
+### Client-Side Implementation
+
+PayStabl SDK handles x402 responses automatically:
+
+```typescript
+class X402Handler {
+  async handleX402Response(response: Response): Promise<PaymentHeaders> {
+    // Parse x402 headers
+    const paymentDetails = this.parseX402Headers(response.headers);
+    
+    // Process payment via PayStabl
+    const payment = await this.paystabl.processPayment({
+      amount: paymentDetails.amount,
+      currency: paymentDetails.currency,
+      purpose: paymentDetails.purpose,
+      recipient: paymentDetails.recipient
+    });
+    
+    // Generate payment headers for retry
+    return {
+      'X-Payment': this.formatPaymentHeader(payment),
+      'X-Payment-Receipt': JSON.stringify(payment.receipt)
+    };
+  }
+  
+  private parseX402Headers(headers: Headers): PaymentDetails {
+    const acceptPayment = headers.get('Accept-Payment');
+    const amount = headers.get('Payment-Amount');
+    const purpose = headers.get('Payment-Purpose');
+    const expires = headers.get('Payment-Expires');
+    
+    return {
+      acceptedMethods: this.parseAcceptPayment(acceptPayment),
+      amount: this.parseAmount(amount),
+      purpose,
+      expiresAt: new Date(expires)
+    };
+  }
+  
+  private formatPaymentHeader(payment: PaymentResult): string {
+    return `type=paystabl receipt=${payment.txHash} signature=${payment.signature} agent=${payment.agentId}`;
+  }
+}
+```
+
+## Error Handling
+
+### Error Response Format
+
+When payment validation fails, servers should return appropriate error codes:
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "error": "payment_invalid",
+  "code": "INSUFFICIENT_AMOUNT",
+  "message": "Payment amount $1.50 is less than required $2.50",
+  "required_amount": "2.50",
+  "received_amount": "1.50",
+  "payment_id": "pay_abc123def456"
+}
+```
+
+### Common Error Codes
+
+| Code | Description | HTTP Status |
+|------|-------------|-------------|
+| `PAYMENT_REQUIRED` | Payment needed to access resource | 402 |
+| `PAYMENT_INVALID` | Payment header format invalid | 400 |
+| `PAYMENT_NOT_FOUND` | Payment transaction not found | 400 |
+| `INSUFFICIENT_AMOUNT` | Payment amount too low | 400 |
+| `PAYMENT_EXPIRED` | Payment offer has expired | 400 |
+| `PAYMENT_ALREADY_USED` | Payment already consumed | 400 |
+| `UNSUPPORTED_METHOD` | Payment method not accepted | 400 |
+
+### Error Handling Implementation
+
+```typescript
+class PaymentErrorHandler {
+  handlePaymentError(error: PaymentError): ErrorResponse {
+    switch (error.code) {
+      case 'INSUFFICIENT_AMOUNT':
+        return {
+          status: 400,
+          error: "payment_invalid",
+          code: error.code,
+          message: `Payment amount ${error.receivedAmount} is less than required ${error.requiredAmount}`,
+          required_amount: error.requiredAmount,
+          received_amount: error.receivedAmount
+        };
+        
+      case 'PAYMENT_EXPIRED':
+        return {
+          status: 400,
+          error: "payment_expired",
+          code: error.code,
+          message: "Payment offer has expired, please request a new payment",
+          expired_at: error.expiredAt,
+          current_time: new Date().toISOString()
+        };
+        
+      case 'PAYMENT_NOT_FOUND':
+        return {
+          status: 400,
+          error: "payment_not_found",
+          code: error.code,
+          message: "Payment transaction not found on blockchain",
+          payment_id: error.paymentId
+        };
+        
+      default:
+        return {
+          status: 500,
+          error: "payment_processing_error",
+          code: "UNKNOWN_ERROR",
+          message: "An error occurred processing the payment"
+        };
+    }
+  }
+}
+```
+
+## Security Considerations
+
+### Payment Verification
+
+Always verify payments on-chain:
+
+```typescript
+class SecurePaymentVerification {
+  async verifyPayment(payment: Payment): Promise<VerificationResult> {
+    // Check signature authenticity
+    const signatureValid = await this.verifySignature(payment);
+    if (!signatureValid) {
+      throw new Error('Invalid payment signature');
+    }
+    
+    // Verify transaction on blockchain
+    const txExists = await this.verifyTransactionExists(payment.receipt);
+    if (!txExists) {
+      throw new Error('Payment transaction not found');
+    }
+    
+    // Check amount and recipient
+    const txDetails = await this.getTransactionDetails(payment.receipt);
+    if (txDetails.amount < this.requiredAmount) {
+      throw new Error('Insufficient payment amount');
+    }
+    
+    if (txDetails.recipient !== this.paymentAddress) {
+      throw new Error('Payment sent to wrong address');
+    }
+    
+    // Check payment hasn't been used before
+    const alreadyUsed = await this.checkPaymentUsed(payment.receipt);
+    if (alreadyUsed) {
+      throw new Error('Payment already consumed');
+    }
+    
+    // Mark payment as used
+    await this.markPaymentUsed(payment.receipt);
+    
+    return {
+      valid: true,
+      amount: txDetails.amount,
+      timestamp: txDetails.timestamp
+    };
+  }
+}
+```
+
+### Rate Limiting
+
+Implement rate limiting for payment requests:
+
+```typescript
+class PaymentRateLimit {
+  private attempts: Map<string, number> = new Map();
+  
+  async checkRateLimit(clientId: string): Promise<boolean> {
+    const key = `payment_attempts:${clientId}`;
+    const attempts = this.attempts.get(key) || 0;
+    
+    if (attempts >= 10) { // Max 10 payment attempts per hour
+      return false;
+    }
+    
+    this.attempts.set(key, attempts + 1);
+    
+    // Reset counter after 1 hour
+    setTimeout(() => {
+      this.attempts.delete(key);
+    }, 60 * 60 * 1000);
+    
+    return true;
+  }
+}
+```
+
+## Implementation Examples
+
+### Express.js Middleware
+
+```typescript
+import express from 'express';
+
+const x402Middleware = (requiredAmount: string, currency: string = 'USD') => {
+  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const paymentHeader = req.headers['x-payment'] as string;
+    
+    if (!paymentHeader) {
+      // Return 402 with payment requirements
+      res.status(402)
+        .set({
+          'Accept-Payment': 'paystabl agent=required, bitcoin lightning=optional',
+          'Payment-Amount': `amount=${requiredAmount} currency=${currency}`,
+          'Payment-Purpose': 'API access fee',
+          'Payment-Expires': new Date(Date.now() + 15 * 60 * 1000).toUTCString()
+        })
+        .json({
+          error: 'payment_required',
+          message: `Payment of ${requiredAmount} ${currency} required`,
+          payment: {
+            amount: requiredAmount,
+            currency,
+            methods: ['paystabl', 'bitcoin'],
+            expires_in: 900 // 15 minutes
+          }
+        });
+      return;
+    }
+    
+    // Validate payment
+    try {
+      const validator = new X402Validator();
+      const result = await validator.validatePaymentHeader(paymentHeader);
+      
+      if (!result.valid) {
+        return res.status(400).json({
+          error: 'payment_invalid',
+          code: result.code,
+          message: result.error
+        });
+      }
+      
+      // Payment valid, continue to API
+      req.payment = result.payment;
+      next();
+      
+    } catch (error) {
+      res.status(500).json({
+        error: 'payment_processing_error',
+        message: 'Error validating payment'
+      });
+    }
+  };
+};
+
+// Usage
+app.get('/premium-data', x402Middleware('2.50'), (req, res) => {
+  res.json({
+    data: 'Premium content',
+    payment: req.payment
+  });
+});
+```
+
+### FastAPI Implementation
+
+```python
+from fastapi import FastAPI, HTTPException, Header, Depends
+from typing import Optional
+import time
+
+app = FastAPI()
+
+class X402Handler:
+    def __init__(self, amount: str, currency: str = "USD"):
+        self.amount = amount
+        self.currency = currency
+        
+    def require_payment(self, x_payment: Optional[str] = Header(None)):
+        if not x_payment:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "error": "payment_required",
+                    "message": f"Payment of {self.amount} {self.currency} required",
+                    "payment": {
+                        "amount": self.amount,
+                        "currency": self.currency,
+                        "methods": ["paystabl", "bitcoin"]
+                    }
+                },
+                headers={
+                    "Accept-Payment": "paystabl agent=required, bitcoin lightning=optional",
+                    "Payment-Amount": f"amount={self.amount} currency={self.currency}",
+                    "Payment-Purpose": "API access fee"
+                }
+            )
+            
+        # Validate payment here
+        payment = self.validate_payment(x_payment)
+        return payment
+    
+    def validate_payment(self, payment_header: str):
+        # Implementation depends on payment method
+        # This is a simplified example
+        return {"valid": True, "amount": self.amount}
+
+# Usage
+payment_handler = X402Handler("2.50")
+
+@app.get("/premium-endpoint")
+async def premium_endpoint(payment = Depends(payment_handler.require_payment)):
+    return {
+        "data": "Premium content",
+        "payment_validated": True
+    }
+```
+
+## Testing x402 Implementation
+
+### Test Server
+
+Create a test server for x402 development:
+
+```typescript
+import express from 'express';
+
+const app = express();
+
+// Test endpoint that always requires payment
+app.get('/test-payment', (req, res) => {
+  const paymentHeader = req.headers['x-payment'];
+  
+  if (!paymentHeader) {
+    return res.status(402)
+      .set({
+        'Accept-Payment': 'paystabl agent=required',
+        'Payment-Amount': 'amount=1.00 currency=USD',
+        'Payment-Purpose': 'Test payment for development'
+      })
+      .json({
+        error: 'payment_required',
+        message: 'Test payment required'
+      });
+  }
+  
+  // For testing, accept any payment header
+  res.json({
+    success: true,
+    message: 'Payment accepted',
+    test_data: {
+      timestamp: new Date().toISOString(),
+      random: Math.random()
+    }
+  });
+});
+
+app.listen(3000, () => {
+  console.log('x402 test server running on port 3000');
+});
+```
+
+### Client Testing
+
+Test x402 handling with curl:
+
+```bash
+# Test 402 response
+curl -v http://localhost:3000/test-payment
+
+# Test with payment header  
+curl -v http://localhost:3000/test-payment \
+  -H "X-Payment: type=paystabl receipt=0x123 agent=test_agent"
+```
+
+## Related Documentation
+
+- [PayStabl API Tools](/docs/tools/pay_api_endpoint)
+- [Architecture Overview](/docs/architecture)
+- [Security Guide](/docs/security)
+- [Integration Examples](/docs/examples/claude_demo)
+
+## External Resources
+
+- [HTTP Status Code 402](https://tools.ietf.org/html/rfc7231#section-6.5.2)
+- [PayStabl Protocol Specification](https://paystabl.com/protocol)
+- [Bitcoin Payment Protocol](https://github.com/bitcoin/bips/blob/master/bip-0070.mediawiki)
+- [Ethereum Payment Standards](https://eips.ethereum.org/EIPS/eip-681)

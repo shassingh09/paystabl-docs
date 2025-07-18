@@ -1,0 +1,251 @@
+---
+sidebar_position: 2
+title: Quick Start
+description: Get started with PayStabl in minutes
+---
+
+# Quickstart Guide
+
+Get your AI agent making autonomous payments in under 5 minutes with this step-by-step guide.
+
+## Prerequisites
+
+- Node.js 18+ or Python 3.8+
+- A Coinbase Developer Platform account
+- Basic understanding of AI agent frameworks
+
+## Step 1: Install PayStabl SDK
+
+### JavaScript/TypeScript
+
+```bash
+npm install @paystabl/sdk
+# or
+yarn add @paystabl/sdk
+```
+
+### Python
+
+```bash
+pip install paystabl-python
+```
+
+## Step 2: Create Your Agent Wallet
+
+```javascript
+import { PayStablAgent } from '@paystabl/sdk';
+
+// Initialize your agent with a new wallet
+const agent = new PayStablAgent({
+  name: "my-first-agent",
+  network: "base-sepolia", // Use testnet for development
+});
+
+// Generate a new wallet for your agent
+const wallet = await agent.createWallet();
+console.log("Agent Wallet Address:", wallet.address);
+console.log("Save this private key securely:", wallet.privateKey);
+```
+
+> **Security Note**: Store the private key securely. In production, use environment variables or a secure key management system.
+
+## Step 3: Fund Your Agent Wallet
+
+For testnet development, get free tokens:
+
+```bash
+# Get Base Sepolia ETH from faucet
+curl -X POST https://faucet.quicknode.com/base/sepolia \
+  -H "Content-Type: application/json" \
+  -d '{"address": "YOUR_WALLET_ADDRESS"}'
+```
+
+Or visit the [Base Sepolia Faucet](https://faucet.quicknode.com/base/sepolia) directly.
+
+## Step 4: Configure Agent Policies
+
+Set up spending limits and security policies:
+
+```javascript
+await agent.configurePolicies({
+  dailyLimit: "10.00",     // Maximum $10 per day
+  perCallLimit: "1.00",    // Maximum $1 per transaction
+  allowedDomains: [        // Restrict to trusted APIs
+    "api.example.com",
+    "premium-data.io"
+  ],
+  requireApproval: {       // Require manual approval for large amounts
+    threshold: "5.00"
+  }
+});
+```
+
+## Step 5: Make Your First Payment
+
+Test the payment system with a simple API call:
+
+```javascript
+// Example: Pay for premium weather data
+try {
+  const result = await agent.pay_api_endpoint({
+    url: "https://api.weatherapi.com/v1/current.json?key=premium&q=London",
+    agentId: "my-first-agent",
+    method: "GET"
+  });
+
+  // Use the payment header in your actual request
+  const response = await fetch(result.url, {
+    headers: {
+      "X-Payment": result.xPaymentHeader,
+      "Content-Type": "application/json"
+    }
+  });
+
+  const data = await response.json();
+  console.log("Weather data:", data);
+  console.log("Payment receipt:", result.receipt);
+
+} catch (error) {
+  console.error("Payment failed:", error.message);
+}
+```
+
+## Step 6: Test Agent-to-Agent Payments
+
+If you have multiple agents, test inter-agent payments:
+
+```javascript
+// Agent A pays Agent B for a service
+await agentA.pay_agent({
+  fromAgentId: "agent-a",
+  toAgentId: "agent-b", 
+  amount: "0.50",
+  purpose: "Used summarization service"
+});
+```
+
+## Common Integration Patterns
+
+### Claude MCP Server Integration
+
+```javascript
+// Install MCP server
+npm install @paystabl/mcp-server
+
+// Configure Claude to use PayStabl tools
+const server = new PayStablMCPServer({
+  agentId: "claude-assistant",
+  apiKey: process.env.PAYSTABL_API_KEY
+});
+
+server.addTool("premium_search", {
+  description: "Search premium database",
+  handler: async (query) => {
+    return await agent.pay_api_endpoint({
+      url: `https://premium-search.com/api?q=${query}`,
+      agentId: "claude-assistant"
+    });
+  }
+});
+```
+
+### LangGraph Integration
+
+```python
+from paystabl import PayStablAgent
+from langgraph import StateGraph
+
+agent = PayStablAgent(agent_id="langgraph-agent")
+
+def payment_node(state):
+    """Node that handles paid API calls"""
+    result = agent.pay_api_endpoint(
+        url=state["api_url"],
+        agent_id="langgraph-agent"
+    )
+    return {"payment_result": result}
+
+# Add to your workflow
+workflow = StateGraph()
+workflow.add_node("payment", payment_node)
+```
+
+## Monitoring and Debugging
+
+### View Transaction History
+
+```javascript
+// Get recent transactions for your agent
+const transactions = await agent.getTransactions({
+  limit: 10,
+  status: "completed"
+});
+
+transactions.forEach(tx => {
+  console.log(`${tx.timestamp}: ${tx.amount} to ${tx.recipient}`);
+});
+```
+
+### Check Agent Balance
+
+```javascript
+const balance = await agent.getBalance();
+console.log(`Agent balance: ${balance.eth} ETH`);
+console.log(`USD equivalent: $${balance.usd}`);
+```
+
+### Error Handling
+
+```javascript
+try {
+  await agent.pay_api_endpoint({ /* ... */ });
+} catch (error) {
+  switch (error.code) {
+    case 'INSUFFICIENT_FUNDS':
+      console.log("Agent needs more funds");
+      break;
+    case 'POLICY_VIOLATION':
+      console.log("Payment blocked by policy:", error.details);
+      break;
+    case 'API_ERROR':
+      console.log("External API error:", error.message);
+      break;
+  }
+}
+```
+
+## Next Steps
+
+Now that your agent is making payments, explore advanced features:
+
+1. **[Payment Tools](/docs/tools/pay_api_endpoint)** - Learn all available payment functions
+2. **[Framework Integrations](/docs/integrations/mcp)** - Connect with Claude, LangGraph, and more
+3. **[Security Guide](/docs/security)** - Implement production-ready security
+4. **[Examples](/docs/examples/claude_demo)** - See real-world implementations
+
+## Troubleshooting
+
+### Common Issues
+
+**"Insufficient funds" error**
+- Check your agent's balance with `agent.getBalance()`
+- Fund your wallet using the testnet faucet
+- Verify you're using the correct network (mainnet vs testnet)
+
+**"Policy violation" error**
+- Review your agent's spending limits
+- Check if the target API is in your allowlist
+- Verify the transaction amount is within limits
+
+**"API not found" error**
+- Ensure the target API supports x402 protocol
+- Check the API endpoint URL is correct
+- Verify your network connectivity
+
+### Getting Help
+
+- [Discord Community](https://discord.gg/paystabl)
+- [GitHub Issues](https://github.com/paystabl/sdk/issues)
+- [Email Support](mailto:support@paystabl.com)
+
+Ready to build something awesome? Check out our [integration guides](/docs/integrations/mcp) and [examples](/docs/examples/claude_demo).

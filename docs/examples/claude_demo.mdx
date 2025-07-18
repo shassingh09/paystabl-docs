@@ -1,0 +1,601 @@
+# Claude MCP Demo
+
+This demo showcases how Claude can use PayStabl to automatically handle payments for premium APIs through the Model Context Protocol (MCP) server integration.
+
+## Demo Overview
+
+In this example, Claude will:
+1. Receive a request for premium data analysis
+2. Automatically pay for required API access
+3. Process the data and return results
+4. Handle payment receipts and error scenarios
+
+## Setup Instructions
+
+### 1. Install PayStabl MCP Server
+
+```bash
+npm install -g @paystabl/mcp-server
+```
+
+### 2. Configure Claude Desktop
+
+Add PayStabl to your Claude Desktop configuration:
+
+```json
+{
+  "mcpServers": {
+    "paystabl": {
+      "command": "paystabl-mcp-server",
+      "args": ["--agent-id", "claude-demo"],
+      "env": {
+        "PAYSTABL_API_KEY": "your-api-key-here",
+        "PAYSTABL_NETWORK": "base-sepolia"
+      }
+    }
+  }
+}
+```
+
+### 3. Fund Your Agent Wallet
+
+Get testnet funds for demonstration:
+
+```bash
+# Request Base Sepolia ETH
+curl -X POST https://faucet.quicknode.com/base/sepolia \
+  -H "Content-Type: application/json" \
+  -d '{"address": "YOUR_WALLET_ADDRESS"}'
+```
+
+## Demo Scenarios
+
+### Scenario 1: Market Data Analysis
+
+**User Request:**
+> "Get the latest crypto market data and analyze the trends for Bitcoin and Ethereum"
+
+**Claude's Response:**
+```
+I'll get the latest crypto market data for you and analyze the trends.
+
+First, let me access the premium market data API...
+
+[Using pay_for_api tool internally]
+✅ Payment processed: $2.50 to CryptoMarketAPI
+Transaction: 0x1234abcd...
+
+Now analyzing the data:
+
+**Bitcoin (BTC)**
+- Current Price: $43,250
+- 24h Change: +2.3% 
+- Volume: $28.5B
+- Trend: Bullish momentum with strong support at $42K
+
+**Ethereum (ETH)**  
+- Current Price: $2,580
+- 24h Change: +1.8%
+- Volume: $15.2B
+- Trend: Steady growth following BTC, resistance at $2.6K
+
+**Analysis:**
+The market shows positive sentiment with both major cryptocurrencies gaining. Bitcoin's break above $43K suggests continued upward momentum, while Ethereum is consolidating before a potential breakout.
+
+Payment Summary: $2.50 for premium market data access
+```
+
+### Scenario 2: Document Processing
+
+**User Request:**
+> "Analyze this contract PDF and extract key terms and potential risks"
+
+**Claude's Response:**
+```
+I'll analyze your contract PDF for key terms and risks.
+
+[Uploading document to premium analysis service...]
+
+[Using pay_for_api tool]
+✅ Payment processed: $5.00 to LegalAnalysisAPI
+Transaction: 0x5678efgh...
+
+**Key Terms Identified:**
+- Contract Duration: 24 months
+- Payment Terms: Net 30 days
+- Termination Clause: 60-day notice required
+- Liability Cap: $100,000
+- Intellectual Property: All rights retained by creator
+
+**Risk Assessment:**
+🔴 **High Risk:** Unlimited liability clause in section 4.2
+🟡 **Medium Risk:** Vague delivery timelines 
+🟢 **Low Risk:** Standard termination provisions
+
+**Recommendations:**
+1. Negotiate liability cap in section 4.2
+2. Define specific delivery milestones
+3. Add force majeure clause
+
+Payment Summary: $5.00 for legal document analysis
+```
+
+### Scenario 3: Agent Collaboration
+
+**User Request:**
+> "I need a comprehensive research report on AI agent frameworks. Can you coordinate with specialist agents?"
+
+**Claude's Response:**
+```
+I'll coordinate with specialist research agents to create a comprehensive report.
+
+**Phase 1: Research Coordination**
+
+[Using pay_agent tool]
+✅ Paid Research Agent: $8.00
+Purpose: AI framework landscape analysis
+Transaction: 0x9abc1234...
+
+[Using pay_agent tool]  
+✅ Paid Technical Writer: $12.00
+Purpose: Report compilation and formatting
+Transaction: 0xdef56789...
+
+**Phase 2: Data Collection**
+
+[Using pay_for_api tool]
+✅ Paid Academic Database: $6.00
+Purpose: Recent research papers and studies
+Transaction: 0x1111aaaa...
+
+**Research Report: AI Agent Frameworks 2024**
+
+**Executive Summary:**
+The AI agent framework landscape has evolved rapidly, with 3 major categories emerging...
+
+[Full detailed report with citations, comparisons, and recommendations]
+
+**Payment Summary:**
+- Research Agent: $8.00
+- Technical Writer: $12.00  
+- Academic Database: $6.00
+- **Total: $26.00**
+
+All payments completed successfully with full audit trail.
+```
+
+## Interactive Demo Scripts
+
+### Basic Payment Demo
+
+Create a simple script to test Claude's payment capabilities:
+
+```javascript
+// demo-script.js
+const readline = require('readline');
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+const demoScenarios = {
+  weather: {
+    prompt: "Get premium weather forecast for San Francisco with detailed hourly breakdown",
+    expectedCost: "$1.50",
+    api: "WeatherPro API"
+  },
+  sentiment: {
+    prompt: "Analyze the sentiment of this text: 'PayStabl is revolutionizing how AI agents handle payments'",
+    expectedCost: "$0.75",
+    api: "SentimentAnalysis API"  
+  },
+  translation: {
+    prompt: "Translate this technical document from English to Japanese with domain expertise",
+    expectedCost: "$3.25",
+    api: "TechnicalTranslation API"
+  }
+};
+
+console.log("🤖 Claude PayStabl Demo");
+console.log("========================");
+console.log("\nAvailable demo scenarios:");
+
+Object.keys(demoScenarios).forEach((key, index) => {
+  const scenario = demoScenarios[key];
+  console.log(`${index + 1}. ${key.toUpperCase()}: ${scenario.expectedCost} - ${scenario.api}`);
+});
+
+rl.question('\nSelect a scenario (1-3) or type a custom request: ', (answer) => {
+  const scenarioKeys = Object.keys(demoScenarios);
+  const selectedIndex = parseInt(answer) - 1;
+  
+  if (selectedIndex >= 0 && selectedIndex < scenarioKeys.length) {
+    const scenario = demoScenarios[scenarioKeys[selectedIndex]];
+    console.log(`\n📋 Demo Scenario: ${scenario.prompt}`);
+    console.log(`💰 Expected Cost: ${scenario.expectedCost}`);
+    console.log(`🔗 API: ${scenario.api}`);
+    console.log("\n✨ Now ask Claude: \"" + scenario.prompt + "\"");
+  } else {
+    console.log(`\n📋 Custom Request: ${answer}`);
+    console.log("\n✨ Ask Claude this question and watch PayStabl handle payments automatically!");
+  }
+  
+  rl.close();
+});
+```
+
+Run the demo:
+```bash
+node demo-script.js
+```
+
+### Payment Monitoring Script
+
+Monitor Claude's payment activity in real-time:
+
+```javascript
+// payment-monitor.js
+const { PayStablAgent } = require('@paystabl/sdk');
+
+class ClaudePaymentMonitor {
+  constructor() {
+    this.agent = new PayStablAgent({
+      agentId: "claude-demo",
+      network: "base-sepolia"
+    });
+    
+    this.startTime = Date.now();
+    this.totalSpent = 0;
+    this.transactionCount = 0;
+  }
+  
+  async startMonitoring() {
+    console.log("🔍 Monitoring Claude's PayStabl Activity");
+    console.log("======================================");
+    
+    // Display initial balance
+    const balance = await this.agent.getBalance();
+    console.log(`💰 Starting Balance: ${balance.eth} ETH`);
+    console.log(`🆔 Agent ID: claude-demo`);
+    console.log(`🌐 Network: Base Sepolia`);
+    console.log("");
+    
+    // Monitor transactions every 10 seconds
+    setInterval(async () => {
+      await this.checkRecentActivity();
+    }, 10000);
+    
+    // Display summary every minute
+    setInterval(() => {
+      this.displaySummary();
+    }, 60000);
+  }
+  
+  async checkRecentActivity() {
+    try {
+      const recent = await this.agent.getTransactions({
+        limit: 5,
+        since: new Date(Date.now() - 15000) // Last 15 seconds
+      });
+      
+      recent.forEach(tx => {
+        if (!this.processedTxs.has(tx.txHash)) {
+          this.processedTxs.add(tx.txHash);
+          this.logTransaction(tx);
+          
+          if (tx.status === 'completed') {
+            this.totalSpent += parseFloat(tx.amount);
+            this.transactionCount++;
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error checking activity:", error.message);
+    }
+  }
+  
+  logTransaction(tx) {
+    const timestamp = new Date().toLocaleTimeString();
+    const status = tx.status === 'completed' ? '✅' : 
+                  tx.status === 'failed' ? '❌' : '⏳';
+    
+    console.log(`[${timestamp}] ${status} ${tx.type.toUpperCase()}`);
+    console.log(`  Amount: $${tx.amount}`);
+    console.log(`  Purpose: ${tx.purpose || 'N/A'}`);
+    console.log(`  Hash: ${tx.txHash.substring(0, 10)}...`);
+    console.log("");
+  }
+  
+  displaySummary() {
+    const runtime = Math.floor((Date.now() - this.startTime) / 1000 / 60);
+    
+    console.log("📊 PAYMENT SUMMARY");
+    console.log("==================");
+    console.log(`⏱️  Runtime: ${runtime} minutes`);
+    console.log(`💸 Total Spent: $${this.totalSpent.toFixed(2)}`);
+    console.log(`📈 Transactions: ${this.transactionCount}`);
+    console.log(`💰 Avg per Transaction: $${(this.totalSpent / Math.max(this.transactionCount, 1)).toFixed(2)}`);
+    console.log("");
+  }
+  
+  processedTxs = new Set();
+}
+
+// Start monitoring
+const monitor = new ClaudePaymentMonitor();
+monitor.startMonitoring().catch(console.error);
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log("\n👋 Stopping payment monitor...");
+  process.exit(0);
+});
+```
+
+Run the monitor:
+```bash
+node payment-monitor.js
+```
+
+## Error Scenarios Demo
+
+### Insufficient Funds
+
+**User Request:**
+> "Analyze this large dataset with the most expensive AI model available"
+
+**Claude's Response:**
+```
+I'll analyze your dataset with our premium AI model.
+
+[Attempting payment...]
+
+❌ Payment failed: Insufficient funds in agent wallet
+
+Current balance: $2.15
+Required amount: $15.00
+
+I need additional funding to access the premium AI model. Here are your options:
+
+1. **Add funds to agent wallet**
+   - Visit: https://faucet.quicknode.com/base/sepolia
+   - Request testnet ETH for demonstration
+
+2. **Use standard analysis** (Available for $2.00)
+   - Slightly less detailed but still comprehensive
+   - Would you like me to proceed with this option?
+
+3. **Request funding approval**
+   - I can notify administrators for funding approval
+
+What would you prefer?
+```
+
+### Service Unavailable
+
+**User Request:**
+> "Get real-time stock prices for AAPL, GOOGL, and TSLA"
+
+**Claude's Response:**
+```
+I'll get the latest stock prices for you.
+
+[Attempting to access MarketData API...]
+
+⚠️ Primary service unavailable (HTTP 503)
+
+Let me try alternative data sources...
+
+[Using pay_for_api with backup service]
+✅ Payment processed: $1.75 to AlternativeMarketAPI
+Transaction: 0xbackup123...
+
+**Stock Prices** (via backup service):
+- AAPL: $185.43 (+1.2%)
+- GOOGL: $142.17 (+0.8%) 
+- TSLA: $248.91 (+2.1%)
+
+*Note: Used backup service due to primary API maintenance*
+Payment: $1.75 (vs $1.25 for primary service)
+```
+
+## Advanced Demo Features
+
+### Multi-Agent Workflow
+
+Demonstrate complex agent collaboration:
+
+```javascript
+// multi-agent-demo.js
+const scenarios = [
+  {
+    name: "Research & Analysis Pipeline",
+    description: "Claude coordinates multiple specialist agents",
+    agents: [
+      { name: "Data Collector", cost: "$3.00", task: "Gather research data" },
+      { name: "Statistical Analyst", cost: "$5.00", task: "Perform statistical analysis" },
+      { name: "Report Writer", cost: "$4.00", task: "Generate final report" }
+    ],
+    totalCost: "$12.00",
+    prompt: "Create a market analysis report for the renewable energy sector"
+  },
+  {
+    name: "Content Creation Workflow", 
+    description: "Multi-step content generation with specialist agents",
+    agents: [
+      { name: "Research Agent", cost: "$2.50", task: "Topic research" },
+      { name: "Content Writer", cost: "$6.00", task: "Draft creation" },
+      { name: "Editor Agent", cost: "$3.50", task: "Content refinement" },
+      { name: "SEO Optimizer", cost: "$2.00", task: "SEO optimization" }
+    ],
+    totalCost: "$14.00",
+    prompt: "Create an SEO-optimized blog post about AI agent payment systems"
+  }
+];
+
+function displayScenario(scenario) {
+  console.log(`\n🎬 ${scenario.name}`);
+  console.log("=".repeat(scenario.name.length + 3));
+  console.log(scenario.description);
+  console.log(`💰 Total Cost: ${scenario.totalCost}`);
+  console.log("\n👥 Agent Workflow:");
+  
+  scenario.agents.forEach((agent, index) => {
+    console.log(`  ${index + 1}. ${agent.name} (${agent.cost}) - ${agent.task}`);
+  });
+  
+  console.log(`\n📝 Prompt: "${scenario.prompt}"`);
+  console.log("\n" + "=".repeat(50));
+}
+
+console.log("🤖 Multi-Agent PayStabl Demo");
+console.log("Multi-agent workflows with automatic payment handling\n");
+
+scenarios.forEach(displayScenario);
+
+console.log("\n✨ Try any of these prompts with Claude to see PayStabl");
+console.log("   coordinate payments across multiple agents automatically!");
+```
+
+### Cost Optimization Demo
+
+Show how PayStabl optimizes costs:
+
+```javascript
+// cost-optimization-demo.js
+const costScenarios = [
+  {
+    task: "Text summarization",
+    options: [
+      { service: "Premium AI", cost: "$2.50", quality: "Excellent" },
+      { service: "Standard AI", cost: "$1.00", quality: "Good" },
+      { service: "Basic AI", cost: "$0.25", quality: "Adequate" }
+    ],
+    recommendation: "Standard AI - best value for quality"
+  },
+  {
+    task: "Language translation", 
+    options: [
+      { service: "Human Expert", cost: "$15.00", quality: "Perfect" },
+      { service: "Advanced AI", cost: "$3.00", quality: "Excellent" },
+      { service: "Basic Translation", cost: "$0.50", quality: "Fair" }
+    ],
+    recommendation: "Advanced AI - professional quality at low cost"
+  }
+];
+
+function demonstrateCostOptimization() {
+  console.log("💡 PayStabl Cost Optimization");
+  console.log("==============================");
+  
+  costScenarios.forEach(scenario => {
+    console.log(`\n📋 Task: ${scenario.task}`);
+    console.log("Options available:");
+    
+    scenario.options.forEach((option, index) => {
+      const selected = option.service.includes(scenario.recommendation.split(' ')[0]) ? "👍" : "  ";
+      console.log(`  ${selected} ${option.service}: ${option.cost} (${option.quality})`);
+    });
+    
+    console.log(`🎯 Recommended: ${scenario.recommendation}`);
+  });
+  
+  console.log("\n✨ PayStabl automatically selects the best value option");
+  console.log("   based on your budget and quality requirements!");
+}
+
+demonstrateCostOptimization();
+```
+
+## Demo Best Practices
+
+### 1. Preparation Checklist
+
+- [ ] MCP server installed and configured
+- [ ] Agent wallet funded with testnet ETH
+- [ ] Claude Desktop restarted after configuration
+- [ ] Payment monitoring script ready
+- [ ] Demo scenarios planned
+
+### 2. Demonstration Flow
+
+1. **Introduction** (2 minutes)
+   - Explain PayStabl concept
+   - Show agent wallet balance
+   - Start payment monitor
+
+2. **Simple Payment Demo** (3 minutes)
+   - Basic API payment request
+   - Show automatic x402 handling
+   - Display payment receipt
+
+3. **Complex Workflow** (5 minutes)
+   - Multi-agent collaboration
+   - Real-time payment tracking
+   - Cost breakdown explanation
+
+4. **Error Handling** (2 minutes)
+   - Insufficient funds scenario
+   - Service unavailability handling
+   - Recovery strategies
+
+5. **Q&A and Discussion** (3 minutes)
+   - Technical questions
+   - Use case discussion
+   - Integration possibilities
+
+### 3. Common Demo Issues
+
+**Issue:** Claude doesn't show payment tools
+- **Solution:** Restart Claude Desktop after MCP configuration
+
+**Issue:** Payment failures during demo
+- **Solution:** Check testnet fund balance before starting
+
+**Issue:** Slow transaction confirmations
+- **Solution:** Use Base Sepolia (faster than Ethereum Sepolia)
+
+**Issue:** MCP server connection errors
+- **Solution:** Verify API key and network settings
+
+## Demo Variations
+
+### Technical Audience Demo
+
+Focus on:
+- x402 protocol details
+- Smart contract interactions
+- Security and policy features
+- Integration architecture
+
+### Business Audience Demo
+
+Focus on:
+- Cost savings and efficiency
+- Autonomous operation benefits
+- Use case scenarios
+- ROI calculations
+
+### Developer Audience Demo
+
+Focus on:
+- SDK integration examples
+- Custom framework implementations
+- Testing and debugging tools
+- Production deployment strategies
+
+## Related Documentation
+
+- [MCP Integration Guide](/docs/integrations/mcp)
+- [Quickstart Guide](/docs/quickstart)
+- [Security Features](/docs/security)
+- [Cost Optimization](/docs/architecture)
+
+## Support
+
+For demo support and questions:
+
+- [Discord Demo Channel](https://discord.gg/paystabl)
+- [Demo Video Tutorials](https://paystabl.com/demos)
+- [Email Support](mailto:demo@paystabl.com)

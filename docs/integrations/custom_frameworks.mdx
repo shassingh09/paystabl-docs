@@ -1,0 +1,1052 @@
+# Custom Framework Integration
+
+Build PayStabl integration for any AI framework or custom agent system using our SDKs and APIs. This guide covers implementation patterns, best practices, and examples for various agent architectures.
+
+## SDK Options
+
+### JavaScript/TypeScript SDK
+
+```bash
+npm install @paystabl/sdk
+```
+
+**Basic Integration:**
+```typescript
+import { PayStablAgent } from '@paystabl/sdk';
+
+class MyCustomAgent {
+  private paystabl: PayStablAgent;
+  
+  constructor(agentId: string, config: AgentConfig) {
+    this.paystabl = new PayStablAgent({
+      agentId,
+      apiKey: config.payStablApiKey,
+      network: config.network || 'base-sepolia'
+    });
+  }
+
+  async callPaidAPI(url: string, options: RequestOptions = {}) {
+    try {
+      // Attempt payment and get headers
+      const payment = await this.paystabl.pay_api_endpoint({
+        url,
+        method: options.method || 'GET',
+        data: options.body,
+        headers: options.headers
+      });
+
+      // Make actual API call with payment header
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          'X-Payment': payment.xPaymentHeader
+        }
+      });
+
+      return {
+        data: await response.json(),
+        payment: payment.receipt
+      };
+
+    } catch (error) {
+      throw new PaymentError(error.message, error.code);
+    }
+  }
+
+  async payOtherAgent(toAgentId: string, amount: string, purpose: string) {
+    return await this.paystabl.pay_agent({
+      fromAgentId: this.agentId,
+      toAgentId,
+      amount,
+      purpose
+    });
+  }
+}
+```
+
+### Python SDK
+
+```bash
+pip install paystabl-python
+```
+
+**Basic Integration:**
+```python
+from paystabl import PayStablAgent
+import requests
+
+class CustomPythonAgent:
+    def __init__(self, agent_id: str, api_key: str):
+        self.agent_id = agent_id
+        self.paystabl = PayStablAgent(
+            agent_id=agent_id,
+            api_key=api_key,
+            network="base-sepolia"
+        )
+    
+    def call_paid_api(self, url: str, method="GET", data=None, headers=None):
+        try:
+            # Get payment authorization
+            payment = self.paystabl.pay_api_endpoint(
+                url=url,
+                method=method,
+                data=data,
+                headers=headers
+            )
+            
+            # Make request with payment header
+            response = requests.request(
+                method=method,
+                url=url,
+                headers={
+                    **(headers or {}),
+                    "X-Payment": payment["xPaymentHeader"]
+                },
+                json=data
+            )
+            
+            return {
+                "data": response.json(),
+                "payment": payment["receipt"]
+            }
+            
+        except Exception as e:
+            raise PaymentException(f"Payment failed: {str(e)}")
+    
+    def pay_agent(self, to_agent_id: str, amount: str, purpose: str):
+        return self.paystabl.pay_agent(
+            from_agent_id=self.agent_id,
+            to_agent_id=to_agent_id,
+            amount=amount,
+            purpose=purpose
+        )
+```
+
+### Go SDK
+
+```bash
+go get github.com/paystabl/paystabl-go
+```
+
+**Basic Integration:**
+```go
+package main
+
+import (
+    "github.com/paystabl/paystabl-go"
+    "net/http"
+    "bytes"
+    "encoding/json"
+)
+
+type CustomGoAgent struct {
+    AgentID   string
+    PayStabl  *paystabl.Client
+}
+
+func NewCustomGoAgent(agentID, apiKey string) *CustomGoAgent {
+    client := paystabl.NewClient(apiKey, paystabl.Config{
+        Network: "base-sepolia",
+    })
+    
+    return &CustomGoAgent{
+        AgentID:  agentID,
+        PayStabl: client,
+    }
+}
+
+func (a *CustomGoAgent) CallPaidAPI(url, method string, body interface{}) (*APIResponse, error) {
+    // Get payment authorization
+    payment, err := a.PayStabl.PayAPIEndpoint(paystabl.APIPaymentRequest{
+        AgentID: a.AgentID,
+        URL:     url,
+        Method:  method,
+        Data:    body,
+    })
+    if err != nil {
+        return nil, err
+    }
+    
+    // Prepare request
+    var reqBody bytes.Buffer
+    if body != nil {
+        json.NewEncoder(&reqBody).Encode(body)
+    }
+    
+    req, err := http.NewRequest(method, url, &reqBody)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Add payment header
+    req.Header.Set("X-Payment", payment.XPaymentHeader)
+    req.Header.Set("Content-Type", "application/json")
+    
+    // Execute request
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, err
+    }
+    defer resp.Body.Close()
+    
+    var result APIResponse
+    json.NewDecoder(resp.Body).Decode(&result)
+    
+    return &result, nil
+}
+
+func (a *CustomGoAgent) PayAgent(toAgentID, amount, purpose string) (*paystabl.PaymentReceipt, error) {
+    return a.PayStabl.PayAgent(paystabl.AgentPaymentRequest{
+        FromAgentID: a.AgentID,
+        ToAgentID:   toAgentID,
+        Amount:      amount,
+        Purpose:     purpose,
+    })
+}
+```
+
+## Integration Patterns
+
+### Event-Driven Architecture
+
+Integrate PayStabl with event-driven agent systems:
+
+```typescript
+import { EventEmitter } from 'events';
+
+class EventDrivenAgent extends EventEmitter {
+  constructor(agentId: string) {
+    super();
+    this.paystabl = new PayStablAgent({ agentId });
+    this.setupPaymentHandlers();
+  }
+
+  setupPaymentHandlers() {
+    // Handle payment requests
+    this.on('api_payment_needed', async (event) => {
+      try {
+        const payment = await this.paystabl.pay_api_endpoint(event.payload);
+        this.emit('payment_completed', { 
+          originalEvent: event, 
+          payment 
+        });
+      } catch (error) {
+        this.emit('payment_failed', { 
+          originalEvent: event, 
+          error 
+        });
+      }
+    });
+
+    // Handle agent-to-agent payments
+    this.on('agent_payment_needed', async (event) => {
+      try {
+        const payment = await this.paystabl.pay_agent(event.payload);
+        this.emit('agent_payment_completed', { 
+          originalEvent: event, 
+          payment 
+        });
+      } catch (error) {
+        this.emit('agent_payment_failed', { 
+          originalEvent: event, 
+          error 
+        });
+      }
+    });
+  }
+
+  async processTask(task) {
+    // Emit payment event when needed
+    if (task.requiresPaidAPI) {
+      this.emit('api_payment_needed', {
+        id: task.id,
+        payload: {
+          url: task.apiUrl,
+          method: 'POST',
+          data: task.parameters
+        }
+      });
+    }
+  }
+}
+
+// Usage
+const agent = new EventDrivenAgent('event_agent_001');
+
+agent.on('payment_completed', (event) => {
+  console.log('Payment successful, continuing with task...');
+  // Continue processing with payment header
+});
+
+agent.on('payment_failed', (event) => {
+  console.log('Payment failed, trying alternative...');
+  // Handle failure gracefully
+});
+```
+
+### Plugin Architecture
+
+Create a PayStabl plugin for existing agent frameworks:
+
+```typescript
+interface AgentPlugin {
+  name: string;
+  version: string;
+  initialize(agent: any): void;
+  destroy(): void;
+}
+
+class PayStablPlugin implements AgentPlugin {
+  name = 'paystabl';
+  version = '1.0.0';
+  
+  private paystabl: PayStablAgent;
+  private agent: any;
+
+  initialize(agent: any) {
+    this.agent = agent;
+    this.paystabl = new PayStablAgent({
+      agentId: agent.id,
+      apiKey: agent.config.payStablApiKey
+    });
+
+    // Add payment methods to agent
+    agent.payForAPI = this.payForAPI.bind(this);
+    agent.payAgent = this.payAgent.bind(this);
+    agent.checkBalance = this.checkBalance.bind(this);
+
+    // Hook into agent's request pipeline
+    if (agent.addRequestMiddleware) {
+      agent.addRequestMiddleware(this.paymentMiddleware.bind(this));
+    }
+  }
+
+  async paymentMiddleware(request: any, next: Function) {
+    // Automatically handle 402 responses
+    const response = await next(request);
+    
+    if (response.status === 402) {
+      console.log('402 Payment Required detected, processing payment...');
+      
+      const payment = await this.paystabl.pay_api_endpoint({
+        url: request.url,
+        method: request.method,
+        data: request.body,
+        headers: request.headers
+      });
+
+      // Retry request with payment header
+      request.headers['X-Payment'] = payment.xPaymentHeader;
+      return await next(request);
+    }
+
+    return response;
+  }
+
+  async payForAPI(url: string, options = {}) {
+    return await this.paystabl.pay_api_endpoint({
+      url,
+      ...options
+    });
+  }
+
+  async payAgent(toAgentId: string, amount: string, purpose: string) {
+    return await this.paystabl.pay_agent({
+      fromAgentId: this.agent.id,
+      toAgentId,
+      amount,
+      purpose
+    });
+  }
+
+  async checkBalance() {
+    return await this.paystabl.getBalance();
+  }
+
+  destroy() {
+    // Cleanup resources
+    this.paystabl = null;
+    this.agent = null;
+  }
+}
+
+// Register plugin with your framework
+AgentFramework.registerPlugin(new PayStablPlugin());
+```
+
+### Microservices Architecture
+
+Integrate PayStabl in a microservices environment:
+
+```typescript
+// Payment Service
+class PaymentMicroservice {
+  private paystabl: PayStablAgent;
+
+  constructor() {
+    this.paystabl = new PayStablAgent({
+      agentId: 'payment_service',
+      apiKey: process.env.PAYSTABL_API_KEY
+    });
+  }
+
+  async handleAPIPayment(req: PaymentRequest): Promise<PaymentResponse> {
+    try {
+      const payment = await this.paystabl.pay_api_endpoint({
+        url: req.url,
+        method: req.method,
+        data: req.data,
+        headers: req.headers
+      });
+
+      return {
+        success: true,
+        xPaymentHeader: payment.xPaymentHeader,
+        receipt: payment.receipt
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        code: error.code
+      };
+    }
+  }
+
+  async handleAgentPayment(req: AgentPaymentRequest): Promise<PaymentResponse> {
+    try {
+      const payment = await this.paystabl.pay_agent({
+        fromAgentId: req.fromAgentId,
+        toAgentId: req.toAgentId,
+        amount: req.amount,
+        purpose: req.purpose
+      });
+
+      return {
+        success: true,
+        txHash: payment.txHash,
+        receipt: payment.xPayStablReceipt
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        code: error.code
+      };
+    }
+  }
+}
+
+// Agent Service (uses Payment Service)
+class AgentMicroservice {
+  private paymentService: PaymentServiceClient;
+
+  constructor() {
+    this.paymentService = new PaymentServiceClient('http://payment-service:3000');
+  }
+
+  async processTask(task: Task) {
+    if (task.requiresPayment) {
+      // Call payment microservice
+      const paymentResult = await this.paymentService.requestAPIPayment({
+        url: task.apiUrl,
+        method: 'POST',
+        data: task.parameters
+      });
+
+      if (paymentResult.success) {
+        // Use payment header for API call
+        const response = await fetch(task.apiUrl, {
+          method: 'POST',
+          headers: {
+            'X-Payment': paymentResult.xPaymentHeader,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(task.parameters)
+        });
+
+        return await response.json();
+      } else {
+        throw new Error(`Payment failed: ${paymentResult.error}`);
+      }
+    }
+  }
+}
+```
+
+## Framework-Specific Examples
+
+### Custom React Agent UI
+
+```typescript
+import React, { useState, useEffect } from 'react';
+import { PayStablAgent } from '@paystabl/sdk';
+
+interface AgentUIProps {
+  agentId: string;
+  apiKey: string;
+}
+
+export const AgentPaymentUI: React.FC<AgentUIProps> = ({ agentId, apiKey }) => {
+  const [paystabl, setPaystabl] = useState<PayStablAgent | null>(null);
+  const [balance, setBalance] = useState<string>('0');
+  const [transactions, setTransactions] = useState<any[]>([]);
+
+  useEffect(() => {
+    const agent = new PayStablAgent({ agentId, apiKey });
+    setPaystabl(agent);
+
+    // Load initial data
+    agent.getBalance().then(setBalance);
+    agent.getTransactions().then(setTransactions);
+  }, [agentId, apiKey]);
+
+  const handleAPIPayment = async (url: string) => {
+    if (!paystabl) return;
+
+    try {
+      const payment = await paystabl.pay_api_endpoint({ url });
+      
+      // Update UI with payment result
+      setTransactions(prev => [...prev, payment.receipt]);
+      
+      // Make actual API call
+      const response = await fetch(url, {
+        headers: { 'X-Payment': payment.xPaymentHeader }
+      });
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Payment failed:', error);
+    }
+  };
+
+  return (
+    <div className="agent-payment-ui">
+      <div className="balance">
+        Balance: ${balance}
+      </div>
+      
+      <div className="transactions">
+        <h3>Recent Transactions</h3>
+        {transactions.map(tx => (
+          <div key={tx.txHash} className="transaction">
+            {tx.amount} - {tx.purpose}
+          </div>
+        ))}
+      </div>
+      
+      <button onClick={() => handleAPIPayment('https://api.example.com/data')}>
+        Pay for Premium Data
+      </button>
+    </div>
+  );
+};
+```
+
+### Custom Django Agent Backend
+
+```python
+# models.py
+from django.db import models
+from paystabl import PayStablAgent
+
+class Agent(models.Model):
+    agent_id = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=200)
+    api_key = models.CharField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def get_paystabl_client(self):
+        return PayStablAgent(
+            agent_id=self.agent_id,
+            api_key=self.api_key
+        )
+
+class PaymentLog(models.Model):
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    purpose = models.CharField(max_length=500)
+    tx_hash = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+# views.py
+from django.http import JsonResponse
+from django.views import View
+from .models import Agent, PaymentLog
+
+class PaymentView(View):
+    def post(self, request, agent_id):
+        try:
+            agent = Agent.objects.get(agent_id=agent_id)
+            paystabl = agent.get_paystabl_client()
+            
+            data = json.loads(request.body)
+            
+            if data['type'] == 'api_payment':
+                result = paystabl.pay_api_endpoint(
+                    url=data['url'],
+                    method=data.get('method', 'GET'),
+                    data=data.get('payload')
+                )
+                
+                # Log the payment
+                PaymentLog.objects.create(
+                    agent=agent,
+                    amount=result['receipt']['amount'],
+                    purpose=f"API payment to {data['url']}",
+                    tx_hash=result['receipt']['txHash']
+                )
+                
+                return JsonResponse({
+                    'success': True,
+                    'payment_header': result['xPaymentHeader'],
+                    'receipt': result['receipt']
+                })
+            
+            elif data['type'] == 'agent_payment':
+                result = paystabl.pay_agent(
+                    from_agent_id=agent_id,
+                    to_agent_id=data['to_agent_id'],
+                    amount=data['amount'],
+                    purpose=data['purpose']
+                )
+                
+                # Log the payment
+                PaymentLog.objects.create(
+                    agent=agent,
+                    amount=data['amount'],
+                    purpose=data['purpose'],
+                    tx_hash=result['txHash']
+                )
+                
+                return JsonResponse({
+                    'success': True,
+                    'tx_hash': result['txHash'],
+                    'receipt': result['xPayStablReceipt']
+                })
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=400)
+```
+
+### FastAPI Integration
+
+```python
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from pydantic import BaseModel
+from paystabl import PayStablAgent
+import asyncio
+
+app = FastAPI(title="Agent Payment API")
+
+class APIPaymentRequest(BaseModel):
+    agent_id: str
+    url: str
+    method: str = "GET"
+    data: dict = None
+    headers: dict = None
+
+class AgentPaymentRequest(BaseModel):
+    from_agent_id: str
+    to_agent_id: str
+    amount: str
+    purpose: str
+
+class PaymentService:
+    def __init__(self):
+        self.agents = {}
+    
+    def get_agent(self, agent_id: str) -> PayStablAgent:
+        if agent_id not in self.agents:
+            self.agents[agent_id] = PayStablAgent(
+                agent_id=agent_id,
+                api_key=os.getenv('PAYSTABL_API_KEY')
+            )
+        return self.agents[agent_id]
+
+payment_service = PaymentService()
+
+@app.post("/api/pay/endpoint")
+async def pay_api_endpoint(request: APIPaymentRequest):
+    try:
+        agent = payment_service.get_agent(request.agent_id)
+        
+        result = await agent.pay_api_endpoint(
+            url=request.url,
+            method=request.method,
+            data=request.data,
+            headers=request.headers
+        )
+        
+        return {
+            "success": True,
+            "payment_header": result["xPaymentHeader"],
+            "receipt": result["receipt"]
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/pay/agent")
+async def pay_agent(request: AgentPaymentRequest):
+    try:
+        agent = payment_service.get_agent(request.from_agent_id)
+        
+        result = await agent.pay_agent(
+            from_agent_id=request.from_agent_id,
+            to_agent_id=request.to_agent_id,
+            amount=request.amount,
+            purpose=request.purpose
+        )
+        
+        return {
+            "success": True,
+            "tx_hash": result["txHash"],
+            "receipt": result["xPayStablReceipt"]
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/agent/{agent_id}/balance")
+async def get_balance(agent_id: str):
+    try:
+        agent = payment_service.get_agent(agent_id)
+        balance = await agent.get_balance()
+        
+        return {
+            "agent_id": agent_id,
+            "balance": balance
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+```
+
+## Testing Your Integration
+
+### Unit Tests
+
+```typescript
+// payment.test.ts
+import { PayStablAgent } from '@paystabl/sdk';
+import { jest } from '@jest/globals';
+
+describe('PayStabl Integration', () => {
+  let agent: PayStablAgent;
+
+  beforeEach(() => {
+    agent = new PayStablAgent({
+      agentId: 'test_agent',
+      apiKey: 'test_key',
+      network: 'base-sepolia'
+    });
+  });
+
+  test('should handle API payment successfully', async () => {
+    const mockPayment = {
+      xPaymentHeader: 'mock_header',
+      receipt: {
+        txHash: 'mock_tx',
+        amount: '1.00'
+      }
+    };
+
+    jest.spyOn(agent, 'pay_api_endpoint').mockResolvedValue(mockPayment);
+
+    const result = await agent.pay_api_endpoint({
+      url: 'https://test-api.com',
+      method: 'GET'
+    });
+
+    expect(result.xPaymentHeader).toBe('mock_header');
+    expect(result.receipt.amount).toBe('1.00');
+  });
+
+  test('should handle payment failures gracefully', async () => {
+    jest.spyOn(agent, 'pay_api_endpoint').mockRejectedValue(
+      new Error('Insufficient funds')
+    );
+
+    await expect(agent.pay_api_endpoint({
+      url: 'https://test-api.com'
+    })).rejects.toThrow('Insufficient funds');
+  });
+});
+```
+
+### Integration Tests
+
+```python
+# test_integration.py
+import pytest
+from paystabl import PayStablAgent
+import asyncio
+
+@pytest.fixture
+def test_agent():
+    return PayStablAgent(
+        agent_id="test_agent_integration",
+        api_key=os.getenv('PAYSTABL_TEST_API_KEY'),
+        network="base-sepolia"
+    )
+
+@pytest.mark.asyncio
+async def test_end_to_end_api_payment(test_agent):
+    # Test with a real test API that supports x402
+    result = await test_agent.pay_api_endpoint(
+        url="https://test-402-api.paystabl.com/premium-data",
+        method="GET"
+    )
+    
+    assert result["xPaymentHeader"] is not None
+    assert result["receipt"]["txHash"] is not None
+    assert float(result["receipt"]["amount"]) > 0
+
+@pytest.mark.asyncio 
+async def test_agent_to_agent_payment(test_agent):
+    # Test payment between test agents
+    result = await test_agent.pay_agent(
+        from_agent_id="test_agent_integration",
+        to_agent_id="test_recipient_agent",
+        amount="0.10",
+        purpose="Integration test payment"
+    )
+    
+    assert result["status"] == "success"
+    assert result["txHash"] is not None
+```
+
+## Best Practices
+
+### Error Handling
+
+```typescript
+class RobustPaymentHandler {
+  private paystabl: PayStablAgent;
+  private retryPolicy: RetryPolicy;
+
+  constructor(agentId: string, config: PaymentConfig) {
+    this.paystabl = new PayStablAgent({ agentId, ...config });
+    this.retryPolicy = config.retryPolicy || this.defaultRetryPolicy;
+  }
+
+  async handlePaymentWithRetry(paymentFn: () => Promise<any>): Promise<any> {
+    let lastError: Error;
+    
+    for (let attempt = 1; attempt <= this.retryPolicy.maxAttempts; attempt++) {
+      try {
+        return await paymentFn();
+      } catch (error) {
+        lastError = error;
+        
+        if (this.isRetryableError(error) && attempt < this.retryPolicy.maxAttempts) {
+          const delay = this.calculateDelay(attempt);
+          await this.sleep(delay);
+          continue;
+        }
+        
+        throw error;
+      }
+    }
+    
+    throw lastError;
+  }
+
+  private isRetryableError(error: any): boolean {
+    const retryableCodes = ['NETWORK_ERROR', 'TIMEOUT', 'RATE_LIMITED'];
+    return retryableCodes.includes(error.code);
+  }
+
+  private calculateDelay(attempt: number): number {
+    return Math.min(1000 * Math.pow(2, attempt - 1), 30000); // Exponential backoff
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+```
+
+### Configuration Management
+
+```typescript
+interface PaymentConfig {
+  agentId: string;
+  apiKey: string;
+  network: 'mainnet' | 'base-sepolia';
+  policies: {
+    dailyLimit: string;
+    perCallLimit: string;
+    allowedDomains: string[];
+  };
+  retryPolicy: {
+    maxAttempts: number;
+    backoffFactor: number;
+  };
+  monitoring: {
+    enableLogging: boolean;
+    alertThresholds: {
+      dailySpend: string;
+      failureRate: number;
+    };
+  };
+}
+
+class ConfigurablePaymentAgent {
+  private config: PaymentConfig;
+  private paystabl: PayStablAgent;
+
+  constructor(config: PaymentConfig) {
+    this.config = this.validateConfig(config);
+    this.paystabl = new PayStablAgent({
+      agentId: config.agentId,
+      apiKey: config.apiKey,
+      network: config.network
+    });
+    
+    this.setupPolicies();
+    this.setupMonitoring();
+  }
+
+  private validateConfig(config: PaymentConfig): PaymentConfig {
+    if (!config.agentId || !config.apiKey) {
+      throw new Error('Agent ID and API key are required');
+    }
+    
+    if (parseFloat(config.policies.dailyLimit) <= 0) {
+      throw new Error('Daily limit must be positive');
+    }
+    
+    return config;
+  }
+
+  private async setupPolicies() {
+    await this.paystabl.configurePolicies({
+      dailyLimit: this.config.policies.dailyLimit,
+      perCallLimit: this.config.policies.perCallLimit,
+      allowedDomains: this.config.policies.allowedDomains
+    });
+  }
+
+  private setupMonitoring() {
+    if (this.config.monitoring.enableLogging) {
+      // Setup logging and monitoring
+      this.paystabl.on('payment_completed', (event) => {
+        console.log(`Payment completed: ${event.amount} to ${event.recipient}`);
+      });
+      
+      this.paystabl.on('payment_failed', (event) => {
+        console.error(`Payment failed: ${event.error}`);
+      });
+    }
+  }
+}
+```
+
+## Deployment Considerations
+
+### Docker Integration
+
+```dockerfile
+# Dockerfile for custom agent with PayStabl
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Copy application code
+COPY . .
+
+# Environment variables
+ENV NODE_ENV=production
+ENV PAYSTABL_API_KEY=""
+ENV AGENT_ID=""
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node healthcheck.js
+
+EXPOSE 3000
+
+CMD ["npm", "start"]
+```
+
+### Kubernetes Deployment
+
+```yaml
+# k8s-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: custom-payment-agent
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: custom-payment-agent
+  template:
+    metadata:
+      labels:
+        app: custom-payment-agent
+    spec:
+      containers:
+      - name: agent
+        image: your-registry/custom-payment-agent:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: PAYSTABL_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: paystabl-secrets
+              key: api-key
+        - name: AGENT_ID
+          value: "k8s-payment-agent"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: paystabl-secrets
+type: Opaque
+data:
+  api-key: <base64-encoded-api-key>
+```
+
+## Related Documentation
+
+- [Core Payment Tools](/docs/tools/pay_api_endpoint)
+- [Security Best Practices](/docs/security)
+- [API Reference](/docs/reference/x402_headers)
+- [Example Implementations](/docs/examples)
+
+## Support
+
+- [SDK Documentation](https://docs.paystabl.com/sdk)
+- [GitHub Repositories](https://github.com/paystabl)
+- [Discord Community](https://discord.gg/paystabl)
+- [Email Support](mailto:support@paystabl.com)

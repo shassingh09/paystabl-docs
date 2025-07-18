@@ -1,0 +1,414 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* AgentPay Gradient Theme */
+:root {
+  --ifm-color-primary: #9333ea;
+  --ifm-color-primary-dark: #7c3aed;
+  --ifm-color-primary-darker: #6d28d9;
+  --ifm-color-primary-darkest: #5b21b6;
+  --ifm-color-primary-light: #a855f7;
+  --ifm-color-primary-lighter: #c084fc;
+  --ifm-color-primary-lightest: #ddd6fe;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+/* Dark theme variables */
+[data-theme='dark'] {
+  --ifm-color-primary: #c084fc;
+  --ifm-color-primary-dark: #a855f7;
+  --ifm-color-primary-darker: #9333ea;
+  --ifm-color-primary-darkest: #7c3aed;
+  --ifm-color-primary-light: #ddd6fe;
+  --ifm-color-primary-lighter: #e879f9;
+  --ifm-color-primary-lightest: #f0abfc;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-background-color: transparent;
+  --ifm-navbar-background-color: rgba(0, 0, 0, 0.2);
+  --ifm-footer-background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Main gradient background */
+html[data-theme='dark'] {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+body {
+  background: transparent;
+  color: white;
+}
+
+/* Main container transparency */
+.main-wrapper {
+  background: transparent;
+}
+
+/* Navbar styling */
+.navbar {
+  background: rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.navbar__brand {
+  color: white;
+}
+
+.navbar__title {
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 800;
+}
+
+.navbar__link {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.navbar__link:hover {
+  color: #c084fc;
+}
+
+/* Sidebar styling */
+.theme-doc-sidebar-container {
+  background: rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.menu {
+  background: transparent;
+}
+
+.menu__link {
+  color: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  margin: 2px 0;
+}
+
+.menu__link:hover {
+  background: rgba(168, 85, 247, 0.2);
+  color: white;
+}
+
+.menu__link--active {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(236, 72, 153, 0.3));
+  color: white;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+
+.menu__list-item-collapsible .menu__link--sublist-caret:after {
+  filter: invert(1);
+}
+
+/* Main content area */
+.theme-doc-markdown {
+  background: transparent;
+  color: white;
+}
+
+.markdown h1 {
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 2.5rem;
+  font-weight: 800;
+}
+
+.markdown h2 {
+  color: #c084fc;
+  border-bottom: 2px solid rgba(168, 85, 247, 0.3);
+  padding-bottom: 8px;
+}
+
+.markdown h3 {
+  color: #ddd6fe;
+}
+
+.markdown p {
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.7;
+}
+
+/* Code blocks */
+.theme-code-block {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  margin: 16px 0;
+}
+
+.prism-code {
+  background: transparent !important;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.token-line {
+  min-height: 24px;
+}
+
+/* Copy button */
+.clean-btn {
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: 500;
+}
+
+.clean-btn:hover {
+  background: linear-gradient(135deg, #9333ea, #db2777);
+  color: white;
+}
+
+/* Cards and admonitions */
+.alert {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  color: white;
+}
+
+.alert--info {
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.alert--warning {
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.alert--danger {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.alert--success {
+  border-color: rgba(34, 197, 94, 0.5);
+}
+
+/* Tables */
+.table-wrapper table {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 12px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.table-wrapper th {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(236, 72, 153, 0.3));
+  color: white;
+  border-bottom: 2px solid rgba(168, 85, 247, 0.5);
+}
+
+.table-wrapper td {
+  color: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Footer */
+.footer {
+  background: rgba(0, 0, 0, 0.3) !important;
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.footer__title {
+  color: #c084fc;
+}
+
+.footer__link-item {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.footer__link-item:hover {
+  color: #c084fc;
+}
+
+.footer__copyright {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Breadcrumbs */
+.breadcrumbs {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  padding: 8px 16px;
+  backdrop-filter: blur(10px);
+}
+
+.breadcrumbs__link {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.breadcrumbs__link:hover {
+  color: #c084fc;
+}
+
+/* Search */
+.DocSearch-Button {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: white;
+}
+
+.DocSearch-Button:hover {
+  background: rgba(168, 85, 247, 0.2);
+  box-shadow: none;
+}
+
+/* Links */
+.markdown a {
+  color: #c084fc;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(192, 132, 252, 0.3);
+  transition: all 0.2s ease;
+}
+
+.markdown a:hover {
+  color: #ddd6fe;
+  border-bottom-color: #ddd6fe;
+}
+
+/* Hide scrollbars */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* Blockquotes */
+.markdown blockquote {
+  background: rgba(168, 85, 247, 0.1);
+  border-left: 4px solid #a855f7;
+  backdrop-filter: blur(10px);
+  border-radius: 0 8px 8px 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Lists */
+.markdown ul, .markdown ol {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.markdown li::marker {
+  color: #c084fc;
+}
+
+/* Inline code */
+.markdown code {
+  background: rgba(168, 85, 247, 0.2);
+  color: #ddd6fe;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.9em;
+}
+
+/* Tab styling for quickstart */
+.tabs {
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+.tabs__item {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.tabs__item:hover {
+  background: rgba(168, 85, 247, 0.1);
+  color: white;
+}
+
+.tabs__item--active {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(236, 72, 153, 0.3));
+  color: white;
+  border-bottom-color: #a855f7;
+}
+
+.tabpanel {
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* Button styling */
+.button {
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  border: none;
+  color: white;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 12px 24px;
+  transition: all 0.2s ease;
+}
+
+.button:hover {
+  background: linear-gradient(135deg, #9333ea, #db2777);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(168, 85, 247, 0.3);
+}
+
+/* Pagination */
+.pagination-nav {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.pagination-nav__link {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+}
+
+.pagination-nav__link:hover {
+  background: rgba(168, 85, 247, 0.2);
+  color: white;
+}
+
+/* Custom spacing */
+.container {
+  max-width: 1200px;
+}
+
+.col {
+  padding: 0 16px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .markdown h1 {
+    font-size: 2rem;
+  }
+  
+  .prism-code {
+    font-size: 14px;
+  }
+  
+  .container {
+    padding: 0 16px;
+  }
+}

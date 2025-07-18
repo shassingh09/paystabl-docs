@@ -1,0 +1,345 @@
+# MCP Server Integration
+
+Integrate PayStabl with Claude via the Model Context Protocol (MCP) server. This enables Claude to make autonomous payments for APIs and services directly through chat interactions.
+
+## Quick Setup
+
+Install the PayStabl MCP server:
+
+```bash
+npm install -g @paystabl/mcp-server
+```
+
+Configure Claude Desktop to use the server:
+
+```json
+{
+  "mcpServers": {
+    "paystabl": {
+      "command": "paystabl-mcp-server",
+      "args": ["--agent-id", "claude-assistant"],
+      "env": {
+        "PAYSTABL_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+## Available Tools
+
+### `pay_for_api`
+Automatically handle HTTP 402 payment requests:
+
+```
+User: "Get the premium weather data for London"
+Claude: I'll get the premium weather data for you.
+
+[Uses pay_for_api tool internally]
+- Calls weather API
+- Receives 402 Payment Required  
+- Automatically pays via PayStabl
+- Retries request with payment header
+- Returns weather data
+
+Here's the current weather in London: [data]
+Payment: $0.25 (Receipt: tx_abc123)
+```
+
+### `pay_agent`
+Send payments to other agents:
+
+```
+User: "Pay the summarization agent $0.50 for the report"
+Claude: I'll send the payment to the summarization agent.
+
+[Uses pay_agent tool]
+Payment sent successfully!
+- Amount: $0.50
+- Recipient: summarization_agent_001
+- Transaction: 0x1234...
+- Purpose: Report summarization service
+```
+
+### `check_balance`
+View current wallet balance:
+
+```
+User: "What's my agent balance?"
+Claude: [Uses check_balance tool]
+
+Your agent wallet currently has:
+- Balance: 2.45 ETH ($4,850.32)
+- Available for payments: $4,800.00
+- Reserved funds: $50.32
+```
+
+## Advanced Configuration
+
+### Custom Agent Setup
+
+Create a specialized agent configuration:
+
+```javascript
+// paystabl-config.js
+module.exports = {
+  agentId: "claude-premium",
+  policies: {
+    dailyLimit: "100.00",
+    perCallLimit: "5.00", 
+    allowedDomains: [
+      "api.openweathermap.org",
+      "api.premium-data.com",
+      "summarization-agent.com"
+    ],
+    requireApproval: {
+      threshold: "10.00"
+    }
+  },
+  integrations: {
+    enableX402: true,
+    enableAgentPayments: true,
+    logTransactions: true
+  }
+};
+```
+
+Start the MCP server with the config:
+
+```bash
+paystabl-mcp-server --config ./paystabl-config.js
+```
+
+### Claude Desktop Integration
+
+Full configuration for Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "paystabl": {
+      "command": "node",
+      "args": [
+        "/usr/local/lib/node_modules/@paystabl/mcp-server/dist/index.js",
+        "--agent-id", "claude-assistant",
+        "--config", "./paystabl-config.js"
+      ],
+      "env": {
+        "PAYSTABL_API_KEY": "your-api-key",
+        "PAYSTABL_NETWORK": "base-sepolia"
+      }
+    }
+  }
+}
+```
+
+## Usage Examples
+
+### Premium API Access
+
+Claude can automatically handle paid API requests:
+
+```
+User: "Analyze this PDF document for me"
+
+Claude: I'll analyze the PDF using a premium document processing service.
+
+[Internally:]
+1. Attempts to call PDF analysis API
+2. Receives 402 Payment Required ($2.50)
+3. Uses pay_for_api to generate payment
+4. Retries request with X-Payment header
+5. Receives analysis results
+
+Here's the analysis of your PDF document:
+[Analysis results...]
+
+Payment processed: $2.50 (Transaction: 0x5678...)
+```
+
+### Agent Collaboration
+
+Claude can pay other agents for specialized tasks:
+
+```
+User: "Get a legal review of this contract"
+
+Claude: I'll send this contract to our legal analysis agent for review.
+
+[Uses pay_agent to compensate legal agent]
+Payment sent: $15.00 to legal_review_agent
+
+[Receives legal analysis]
+Here's the legal review of your contract:
+[Detailed legal analysis...]
+
+Payment completed successfully.
+```
+
+### Multi-Step Workflows
+
+Claude can orchestrate complex paid workflows:
+
+```
+User: "Create a research report on AI trends"
+
+Claude: I'll create a comprehensive research report using multiple specialized services:
+
+1. Gathering data from premium research APIs...
+   ✓ Paid $3.00 for market data access
+   
+2. Getting industry analysis...
+   ✓ Paid analysis_agent $5.00 for trend analysis
+   
+3. Generating visualizations...
+   ✓ Paid chart_agent $2.00 for data visualization
+   
+4. Professional formatting...
+   ✓ Paid formatting_agent $1.50 for document layout
+
+Total spent: $11.50
+
+Here's your comprehensive AI trends research report:
+[Complete formatted report with charts and analysis]
+```
+
+## Error Handling
+
+The MCP server includes robust error handling:
+
+### Insufficient Funds
+```
+Claude: I attempted to access the premium data service, but your agent wallet has insufficient funds. 
+
+Current balance: $0.45
+Required payment: $2.50
+
+Please fund your agent wallet to continue.
+```
+
+### Policy Violations
+```
+Claude: The payment request ($25.00) exceeds your daily limit of $20.00. 
+
+Would you like me to:
+1. Request approval for this higher amount
+2. Use a different service with lower cost
+3. Split the request into smaller parts
+```
+
+### API Errors
+```
+Claude: I encountered an issue with the payment processing:
+
+Error: The target API doesn't support x402 protocol
+Alternative: I can try a different service that supports PayStabl payments.
+```
+
+## Security Features
+
+### Transaction Logging
+All payments are logged with full context:
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:00Z",
+  "agentId": "claude-assistant", 
+  "action": "pay_for_api",
+  "amount": "2.50",
+  "recipient": "api.premium-service.com",
+  "purpose": "PDF document analysis",
+  "txHash": "0x1234...",
+  "userContext": "User requested PDF analysis",
+  "success": true
+}
+```
+
+### Policy Enforcement
+- Daily spending limits
+- Per-transaction limits  
+- Domain allowlists
+- Approval workflows for large payments
+- Time-based restrictions
+
+### Audit Trail
+```
+User: "Show me my recent payments"
+
+Claude: Here are your recent PayStabl transactions:
+
+Today (Jan 15, 2024):
+- $2.50 → PDF Analysis API (10:30 AM)
+- $5.00 → Research Agent (11:15 AM) 
+- $1.25 → Translation Service (2:20 PM)
+Total: $8.75
+
+This week: $45.30
+This month: $156.80
+
+All transactions are recorded on-chain for full transparency.
+```
+
+## Troubleshooting
+
+### MCP Server Not Starting
+```bash
+# Check if PayStabl MCP server is installed
+npm list -g @paystabl/mcp-server
+
+# Verify configuration
+paystabl-mcp-server --verify-config
+
+# Check logs
+tail -f ~/.claude/mcp-logs/paystabl.log
+```
+
+### Payment Failures
+```bash
+# Test PayStabl connection
+paystabl-mcp-server --test-connection
+
+# Verify agent wallet
+paystabl-mcp-server --check-balance
+
+# Validate API key
+paystabl-mcp-server --validate-key
+```
+
+### Claude Integration Issues
+
+1. **Tools not appearing**: Restart Claude Desktop after config changes
+2. **Permission denied**: Check MCP server permissions and API key
+3. **Network errors**: Verify internet connection and firewall settings
+
+## Best Practices
+
+### Agent Wallet Management
+- Start with testnet for development
+- Set reasonable daily limits ($10-50)
+- Monitor spending regularly
+- Keep wallet funded but not over-funded
+
+### User Communication
+- Always inform users about payments before processing
+- Show payment amounts and recipients clearly
+- Provide transaction receipts
+- Explain the value provided for each payment
+
+### Error Recovery
+- Gracefully handle payment failures
+- Suggest alternatives when payments fail
+- Provide clear next steps for resolution
+- Log errors for debugging
+
+## Related Documentation
+
+- [Tool Reference: pay_api_endpoint](/docs/tools/pay_api_endpoint)
+- [Tool Reference: pay_agent](/docs/tools/pay_agent)
+- [Security Guide](/docs/security)
+- [Quickstart Guide](/docs/quickstart)
+
+## Support
+
+- [MCP Server GitHub](https://github.com/paystabl/mcp-server)
+- [Discord Community](https://discord.gg/paystabl)
+- [Email Support](mailto:support@paystabl.com)

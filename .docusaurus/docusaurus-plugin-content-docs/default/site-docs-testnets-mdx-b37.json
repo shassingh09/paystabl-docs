@@ -1,0 +1,20 @@
+{
+  "id": "testnets",
+  "title": "Testnet Development",
+  "description": "Develop and test your PayStabl agent integrations on testnets before deploying to production. This guide covers testnet setup, faucets, debugging tools, and best practices for agent development.",
+  "source": "@site/docs/testnets.mdx",
+  "sourceDirName": ".",
+  "slug": "/testnets",
+  "permalink": "/testnets",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/testnets.mdx",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Security Guide",
+    "permalink": "/security"
+  }
+}

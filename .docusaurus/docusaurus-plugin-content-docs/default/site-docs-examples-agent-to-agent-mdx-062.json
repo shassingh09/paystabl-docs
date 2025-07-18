@@ -1,0 +1,24 @@
+{
+  "id": "examples/agent_to_agent",
+  "title": "Agent-to-Agent Payment Examples",
+  "description": "This guide demonstrates how AI agents can autonomously pay each other for services, creating collaborative workflows and marketplace dynamics. Examples show real-world scenarios where agents exchange value.",
+  "source": "@site/docs/examples/agent_to_agent.mdx",
+  "sourceDirName": "examples",
+  "slug": "/examples/agent_to_agent",
+  "permalink": "/examples/agent_to_agent",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/examples/agent_to_agent.mdx",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "LangGraph Payment Retry Example",
+    "permalink": "/examples/langgraph_retry"
+  },
+  "next": {
+    "title": "🤝 Tool: pay_agent",
+    "permalink": "/tools/pay_agent"
+  }
+}

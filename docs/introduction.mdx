@@ -1,0 +1,111 @@
+---
+sidebar_position: 1
+title: Introduction
+description: Learn about PayStabl's programmable wallet infrastructure for AI agents
+---
+
+# What is PayStabl?
+
+PayStabl is a programmable wallet infrastructure platform that empowers AI agents with autonomous onchain transaction capabilities. It provides CDP-powered smart wallets with policy governance, session controls, and seamless M2M (machine-to-machine) commerce capabilities.
+
+## The Problem
+
+Traditional payment systems weren't designed for autonomous AI agents. Current challenges include:
+
+- **Manual Payment Flows** - Agents can't handle payment requests without human intervention
+- **No Micropayment Support** - High fees make small API payments uneconomical
+- **Complex Integration** - Each payment provider requires custom implementation
+- **Limited Agent Autonomy** - Agents can't make purchasing decisions independently
+
+## The Solution
+
+PayStabl enables true autonomous commerce through:
+
+### 🤖 Agent-Native Design
+- Programmable wallets designed specifically for AI systems
+- Policy-based spending controls and session management
+- Automatic transaction handling without human intervention
+
+### 💳 x402 Protocol Integration
+- Native support for HTTP 402 "Payment Required" responses
+- Automatic payment header generation and request retry logic
+- Seamless integration with existing API architectures
+
+### 🔗 Inter-Agent Commerce
+- Direct agent-to-agent payment capabilities
+- Compensation for tool usage, data access, and compute resources
+- Built-in reputation and trust mechanisms
+
+### 🛡️ Enterprise Security
+- Gasless transactions via paymaster integration
+- Multi-signature wallet support for team agents
+- Comprehensive audit trails and compliance reporting
+
+## Key Features
+
+### Programmable Wallets
+Each agent gets a smart contract wallet with:
+- Configurable spending limits and policies
+- Session-based allowances for temporary operations
+- Multi-sig support for high-value transactions
+- Gas abstraction for seamless user experience
+
+### Policy Governance
+- **Spending Limits** - Daily, weekly, or per-transaction caps
+- **Allowlists** - Restrict payments to approved services only
+- **Time-based Controls** - Enable payments during specific hours
+- **Amount Thresholds** - Require approval for large transactions
+
+### Framework Integration
+Pre-built integrations for popular AI frameworks:
+- **Claude MCP Server** - Tool-based payment integration
+- **LangGraph** - Payment-enabled workflow nodes
+- **Custom Runtimes** - SDK for any agent framework
+
+## Use Cases
+
+### API Monetization
+- Convert existing APIs to paid services with x402 headers
+- Automatic micropayment handling for per-request pricing
+- Dynamic pricing based on usage patterns or demand
+
+### Agent Collaboration
+- Agents paying each other for specialized services
+- Distributed compute marketplaces
+- Data sharing and processing pipelines
+
+### Autonomous Services
+- Self-managing SaaS subscriptions
+- Dynamic resource provisioning
+- Automated vendor payments
+
+## Architecture Overview
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   AI Agent      │    │   PayStabl Core  │    │  External APIs  │
+│                 │    │                  │    │                 │
+│ ┌─────────────┐ │    │ ┌──────────────┐ │    │ ┌─────────────┐ │
+│ │ Agent Logic │ │───▶│ │ Wallet Engine│ │───▶│ │ x402 Service│ │
+│ └─────────────┘ │    │ └──────────────┘ │    │ └─────────────┘ │
+│                 │    │                  │    │                 │
+│ ┌─────────────┐ │    │ ┌──────────────┐ │    │ ┌─────────────┐ │
+│ │ PayStabl SDK│ │◀───│ │ Policy Engine│ │    │ │ Other Agents│ │
+│ └─────────────┘ │    │ └──────────────┘ │    │ └─────────────┘ │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+```
+
+## Getting Started
+
+Ready to enable autonomous payments for your AI agents? 
+
+1. [**Quickstart Guide**](/docs/quickstart) - Set up your first agent wallet
+2. [**Tool Reference**](/docs/tools/pay_api_endpoint) - Learn the core payment functions
+3. [**Integration Guides**](/docs/integrations/mcp) - Connect with your framework
+4. [**Examples**](/docs/examples/claude_demo) - See real implementations
+
+## Next Steps
+
+- [Create your first agent wallet](/docs/quickstart)
+- [Explore the payment tools](/docs/tools/pay_api_endpoint)
+- [Check out framework integrations](/docs/integrations/mcp)

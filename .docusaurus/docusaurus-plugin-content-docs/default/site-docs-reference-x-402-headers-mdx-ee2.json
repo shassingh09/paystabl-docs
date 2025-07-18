@@ -1,0 +1,24 @@
+{
+  "id": "reference/x402_headers",
+  "title": "x402 Headers Reference",
+  "description": "The x402 protocol defines a standard HTTP status code and header structure for payment-required API endpoints. This reference covers the complete specification, validation rules, and implementation details for x402-enabled services.",
+  "source": "@site/docs/reference/x402_headers.mdx",
+  "sourceDirName": "reference",
+  "slug": "/reference/x402_headers",
+  "permalink": "/reference/x402_headers",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/reference/x402_headers.mdx",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "🛠️ Tool: pay_api_endpoint",
+    "permalink": "/tools/pay_api_endpoint"
+  },
+  "next": {
+    "title": "Security Guide",
+    "permalink": "/security"
+  }
+}

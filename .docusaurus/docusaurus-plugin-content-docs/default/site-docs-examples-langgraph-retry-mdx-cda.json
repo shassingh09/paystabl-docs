@@ -1,0 +1,24 @@
+{
+  "id": "examples/langgraph_retry",
+  "title": "LangGraph Payment Retry Example",
+  "description": "This example demonstrates how to implement robust payment retry logic in LangGraph workflows using PayStabl. It shows how to handle payment failures gracefully and implement different retry strategies.",
+  "source": "@site/docs/examples/langgraph_retry.mdx",
+  "sourceDirName": "examples",
+  "slug": "/examples/langgraph_retry",
+  "permalink": "/examples/langgraph_retry",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/examples/langgraph_retry.mdx",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Claude MCP Demo",
+    "permalink": "/examples/claude_demo"
+  },
+  "next": {
+    "title": "Agent-to-Agent Payment Examples",
+    "permalink": "/examples/agent_to_agent"
+  }
+}

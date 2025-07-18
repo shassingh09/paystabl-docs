@@ -1,0 +1,291 @@
+# 🛠️ Tool: `pay_api_endpoint`
+
+Use this tool to call external APIs that support the **x402 protocol** via a `402 Payment Required` response. PayStabl handles the full payment flow, including generating the signed `X-Payment` header and retrying the request.
+
+---
+
+## 🔄 Workflow
+
+1. Agent attempts to access an x402-enabled API.
+2. The server responds with `402 Payment Required`, including `accepts` array.
+3. Agent calls `pay_api_endpoint()` with the endpoint and metadata.
+4. PayStabl returns a valid `X-Payment` header.
+5. Agent retries the original request with the header.
+
+---
+
+## ✅ Input
+
+```json
+{
+  "agentId": "agent_abc",
+  "url": "https://api.example.com/paid-resource",
+  "method": "GET",
+  "data": {}, // optional for POST
+  "headers": { "User-Agent": "Claude v3" } // optional
+}
+```
+
+## 🧾 Output
+
+```json
+{
+  "xPaymentHeader": "0x...",
+  "receipt": {
+    "txHash": "...",
+    "amount": "0.10",
+    "to": "0x123...",
+    "agentId": "agent_abc"
+  }
+}
+```
+
+## 🧪 Example Usage (JS)
+
+```javascript
+const result = await pay_api_endpoint({
+  agentId: "agent_abc",
+  url: "https://api.example.com/convert-pdf",
+});
+
+fetch(url, {
+  headers: { "X-Payment": result.xPaymentHeader }
+});
+```
+
+## 🛡️ Notes
+
+- The original API must return 402 and provide an accepts array (per x402 spec).
+- Agent must be onboarded to PayStabl and have a funded wallet.
+
+---
+
+## Detailed API Reference
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `agentId` | string | Yes | Unique identifier for the paying agent |
+| `url` | string | Yes | Target API endpoint URL |
+| `method` | string | No | HTTP method (default: "GET") |
+| `data` | object | No | Request body for POST/PUT requests |
+| `headers` | object | No | Additional headers to include |
+| `timeout` | number | No | Request timeout in milliseconds (default: 30000) |
+| `retries` | number | No | Number of retry attempts (default: 3) |
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `xPaymentHeader` | string | Signed payment header for the request |
+| `receipt` | object | Transaction receipt details |
+| `receipt.txHash` | string | Blockchain transaction hash |
+| `receipt.amount` | string | Payment amount in USD |
+| `receipt.to` | string | Recipient wallet address |
+| `receipt.timestamp` | string | Transaction timestamp (ISO 8601) |
+
+## Advanced Usage
+
+### Error Handling
+
+```javascript
+try {
+  const result = await pay_api_endpoint({
+    agentId: "weather_agent",
+    url: "https://premium-weather.com/api/forecast"
+  });
+  
+  // Make the actual API request
+  const response = await fetch(result.url, {
+    headers: { "X-Payment": result.xPaymentHeader }
+  });
+  
+  if (response.status === 402) {
+    throw new Error("Payment was not accepted by the API");
+  }
+  
+  const data = await response.json();
+  return data;
+  
+} catch (error) {
+  if (error.code === 'INSUFFICIENT_FUNDS') {
+    console.log("Agent wallet needs funding");
+  } else if (error.code === 'POLICY_VIOLATION') {
+    console.log("Payment blocked by agent policy");
+  } else {
+    console.log("Payment failed:", error.message);
+  }
+}
+```
+
+### Batch Payments
+
+For multiple API calls, you can batch them efficiently:
+
+```javascript
+const endpoints = [
+  "https://api.service1.com/data",
+  "https://api.service2.com/analyze",
+  "https://api.service3.com/process"
+];
+
+const payments = await Promise.all(
+  endpoints.map(url => pay_api_endpoint({
+    agentId: "batch_agent",
+    url
+  }))
+);
+
+// Execute all requests with payment headers
+const responses = await Promise.all(
+  payments.map((payment, index) => 
+    fetch(endpoints[index], {
+      headers: { "X-Payment": payment.xPaymentHeader }
+    })
+  )
+);
+```
+
+### Dynamic Pricing Support
+
+Some APIs may return different prices based on the request:
+
+```javascript
+// First, check the price without paying
+const priceCheck = await fetch("https://api.service.com/price-check", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ query: "complex_analysis" })
+});
+
+if (priceCheck.status === 402) {
+  const priceInfo = await priceCheck.json();
+  console.log(`This request will cost: $${priceInfo.amount}`);
+  
+  // Proceed with payment if acceptable
+  if (parseFloat(priceInfo.amount) <= 1.00) {
+    const payment = await pay_api_endpoint({
+      agentId: "price_conscious_agent",
+      url: "https://api.service.com/analyze",
+      method: "POST",
+      data: { query: "complex_analysis" }
+    });
+    
+    // Continue with the paid request...
+  }
+}
+```
+
+## Integration Examples
+
+### Claude MCP Server
+
+```typescript
+import { PayStablMCPServer } from '@paystabl/mcp-server';
+
+const server = new PayStablMCPServer({
+  agentId: "claude_assistant"
+});
+
+server.addTool("premium_search", {
+  description: "Search premium database with payment",
+  parameters: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "Search query" }
+    }
+  },
+  handler: async ({ query }) => {
+    const payment = await pay_api_endpoint({
+      agentId: "claude_assistant",
+      url: `https://premium-search.com/api?q=${encodeURIComponent(query)}`
+    });
+    
+    const response = await fetch(payment.url, {
+      headers: { "X-Payment": payment.xPaymentHeader }
+    });
+    
+    return await response.json();
+  }
+});
+```
+
+### LangGraph Node
+
+```python
+from paystabl import PayStablAgent
+
+def create_payment_node(agent: PayStablAgent):
+    def payment_node(state):
+        result = agent.pay_api_endpoint(
+            agent_id=state["agent_id"],
+            url=state["api_url"],
+            method=state.get("method", "GET"),
+            data=state.get("data")
+        )
+        
+        # Store payment info in state
+        return {
+            "payment_header": result["xPaymentHeader"],
+            "payment_receipt": result["receipt"]
+        }
+    
+    return payment_node
+```
+
+## Security Considerations
+
+### Agent Policies
+
+Always configure appropriate policies for your agents:
+
+```javascript
+await agent.configurePolicies({
+  dailyLimit: "50.00",
+  perCallLimit: "5.00",
+  allowedDomains: [
+    "trusted-api.com",
+    "premium-service.io"
+  ],
+  timeRestrictions: {
+    allowedHours: [9, 17], // 9 AM to 5 PM
+    timezone: "UTC"
+  }
+});
+```
+
+### Monitoring
+
+Monitor your agent's spending:
+
+```javascript
+// Check recent transactions
+const transactions = await agent.getTransactions({
+  since: "2024-01-01",
+  status: "completed"
+});
+
+// Set up alerts for unusual activity
+const dailySpend = transactions
+  .filter(tx => tx.timestamp > startOfDay)
+  .reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+
+if (dailySpend > 100) {
+  console.warn("High spending detected:", dailySpend);
+}
+```
+
+## Related Tools
+
+- [`pay_agent`](/docs/tools/pay_agent) - Send payments between agents
+- [x402 Headers Reference](/docs/reference/x402_headers) - Technical specification
+- [Security Guide](/docs/security) - Best practices for production
+
+## Support
+
+Having issues with API payments? Check our [troubleshooting guide](/docs/troubleshooting) or reach out:
+
+- [Discord Community](https://discord.gg/paystabl)
+- [GitHub Issues](https://github.com/paystabl/sdk/issues)
+- [Email Support](mailto:support@paystabl.com)

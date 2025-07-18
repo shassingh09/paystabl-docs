@@ -1,0 +1,24 @@
+{
+  "id": "integrations/mcp",
+  "title": "MCP Server Integration",
+  "description": "Integrate PayStabl with Claude via the Model Context Protocol (MCP) server. This enables Claude to make autonomous payments for APIs and services directly through chat interactions.",
+  "source": "@site/docs/integrations/mcp.mdx",
+  "sourceDirName": "integrations",
+  "slug": "/integrations/mcp",
+  "permalink": "/integrations/mcp",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/paystabl/docs/tree/main/docs/integrations/mcp.mdx",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "System Architecture",
+    "permalink": "/architecture"
+  },
+  "next": {
+    "title": "LangGraph Integration",
+    "permalink": "/integrations/langgraph"
+  }
+}
